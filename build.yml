@@ -1,0 +1,70 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Code holen
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Abhängigkeiten installieren
+        run: |
+          pip install pyinstaller flask flask-cors
+
+      - name: yt-dlp.exe herunterladen
+        run: |
+          curl -L "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -o yt-dlp.exe
+
+      - name: EXE bauen
+        run: |
+          pyinstaller `
+            --onefile `
+            --noconsole `
+            --name "YT-Playlist-Downloader" `
+            --add-data "index.html;." `
+            --add-binary "yt-dlp.exe;." `
+            --hidden-import flask `
+            --hidden-import flask_cors `
+            --hidden-import tkinter `
+            --hidden-import tkinter.filedialog `
+            --hidden-import werkzeug `
+            --hidden-import werkzeug.serving `
+            --hidden-import werkzeug.routing `
+            app.py
+
+      - name: EXE als Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: YT-Playlist-Downloader
+          path: dist/YT-Playlist-Downloader.exe
+
+      - name: GitHub Release erstellen
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: latest
+          name: "YT Playlist Downloader"
+          body: |
+            ## ▶ YT Playlist Downloader
+
+            **Einfach `.exe` herunterladen und starten – fertig!**
+            Kein Python, keine Installation nötig.
+
+            ### Was ist das?
+            Lädt komplette YouTube-Playlists als MP4 oder MP3 herunter.
+            Öffnet automatisch eine Oberfläche im Browser.
+          files: dist/YT-Playlist-Downloader.exe
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
