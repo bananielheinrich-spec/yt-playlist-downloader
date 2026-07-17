@@ -3,390 +3,696 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Playlist Downloader Pro</title>
+    <title>YouTube Playlist Downloader</title>
     <style>
-        :root {
-            --bg-color: #0f0f0f;
-            --container-bg: #1f1f1f;
-            --accent-color: #ff0000;
-            --accent-hover: #cc0000;
-            --text-color: #f1f1f1;
-            --text-muted: #aaaaaa;
-            --card-bg: #282828;
-            --button-mp3: #007bff;
-            --button-mp3-hover: #0056b3;
-        }
-
         * {
-            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            box-sizing: border-box;
         }
 
         body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             min-height: 100vh;
+            padding: 20px;
         }
 
         .container {
-            width: 100%;
-            max-width: 800px;
-            background-color: var(--container-bg);
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            animation: slideDown 0.6s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         h1 {
-            font-size: 1.8rem;
-            margin-bottom: 20px;
-            text-align: center;
-            font-weight: 700;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #ff0000, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
-        h1 span {
-            color: var(--accent-color);
+        .subtitle {
+            color: #a0a0a0;
+            font-size: 0.95em;
+        }
+
+        .input-section {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            animation: fadeIn 0.6s ease-out 0.2s both;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .input-group {
             display: flex;
             gap: 10px;
-            margin-bottom: 25px;
+            flex-wrap: wrap;
         }
 
         input[type="text"] {
             flex: 1;
-            padding: 12px 16px;
-            border: 2px solid #333;
-            border-radius: 8px;
-            background-color: #121212;
-            color: var(--text-color);
-            font-size: 1rem;
-            outline: none;
-            transition: border-color 0.2s;
+            min-width: 250px;
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            color: #e0e0e0;
+            font-size: 1em;
+            transition: all 0.3s ease;
         }
 
         input[type="text"]:focus {
-            border-color: var(--accent-color);
+            outline: none;
+            border-color: #ff0000;
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
+        }
+
+        input[type="text"]::placeholder {
+            color: #808080;
         }
 
         button {
-            padding: 12px 24px;
+            padding: 15px 35px;
+            background: linear-gradient(45deg, #ff0000, #ff6b6b);
+            color: white;
             border: none;
-            border-radius: 8px;
-            font-size: 1rem;
+            border-radius: 10px;
+            font-size: 1em;
             font-weight: 600;
             cursor: pointer;
-            transition: background-color 0.2s, transform 0.1s;
-            color: white;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 0, 0, 0.3);
+            white-space: nowrap;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 0, 0, 0.5);
         }
 
         button:active {
-            transform: scale(0.98);
+            transform: translateY(0);
         }
 
-        .btn-main {
-            background-color: var(--accent-color);
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
         }
 
-        .btn-main:hover {
-            background-color: var(--accent-hover);
+        .info-message {
+            background: rgba(76, 175, 80, 0.2);
+            border-left: 4px solid #4caf50;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: #90ee90;
         }
 
-        .status-message {
+        .error-message {
+            background: rgba(244, 67, 54, 0.2);
+            border-left: 4px solid #f44336;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: #ff9999;
+        }
+
+        .loading {
             text-align: center;
-            margin-bottom: 20px;
-            font-size: 0.95rem;
-            color: var(--text-muted);
-            line-height: 1.4;
+            padding: 40px;
+            color: #a0a0a0;
         }
 
-        .playlist-info {
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #333;
-            display: none;
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-top-color: #ff0000;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
 
-        .playlist-title {
-            font-size: 1.2rem;
-            font-weight: 600;
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
-        .video-list {
+        .videos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        .video-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease;
             display: flex;
             flex-direction: column;
-            gap: 15px;
-            max-height: 600px;
-            overflow-y: auto;
-            padding-right: 5px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
         }
 
-        .video-list::-webkit-scrollbar {
-            width: 6px;
-        }
-        .video-list::-webkit-scrollbar-track {
-            background: #121212;
-            border-radius: 4px;
-        }
-        .video-list::-webkit-scrollbar-thumb {
-            background: #444;
-            border-radius: 4px;
-        }
-
-        .video-item {
-            display: flex;
-            gap: 15px;
-            background-color: var(--card-bg);
-            padding: 12px;
-            border-radius: 8px;
-            align-items: center;
+        .video-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 0, 0, 0.3);
+            box-shadow: 0 8px 25px rgba(255, 0, 0, 0.2);
         }
 
         .video-thumbnail {
-            width: 120px;
-            height: 68px;
-            object-fit: cover;
-            border-radius: 6px;
-            background-color: #000;
-            flex-shrink: 0;
+            width: 100%;
+            height: 160px;
+            background: #2a2a3e;
+            position: relative;
+            overflow: hidden;
         }
 
-        .video-details {
-            flex: 1;
-            min-width: 0;
+        .video-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .video-card:hover .video-thumbnail img {
+            transform: scale(1.05);
+        }
+
+        .play-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 0, 0, 0.8);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .video-card:hover .play-icon {
+            opacity: 1;
+        }
+
+        .video-info {
+            padding: 15px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
         }
 
         .video-title {
-            font-size: 0.95rem;
             font-weight: 600;
             margin-bottom: 8px;
-            white-space: nowrap;
+            line-height: 1.4;
+            color: #e0e0e0;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
             overflow: hidden;
-            text-overflow: ellipsis;
         }
 
-        .actions {
+        .video-duration {
+            font-size: 0.85em;
+            color: #a0a0a0;
+            margin-bottom: 12px;
+        }
+
+        .download-buttons {
             display: flex;
             gap: 8px;
+            flex-wrap: wrap;
         }
 
-        .btn-download {
-            padding: 8px 14px;
-            font-size: 0.85rem;
+        .download-btn {
+            flex: 1;
+            min-width: 80px;
+            padding: 8px 12px;
+            font-size: 0.85em;
+            background: linear-gradient(45deg, #1976d2, #42a5f5);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
         }
 
-        .btn-mp4 {
-            background-color: #333;
-        }
-        .btn-mp4:hover {
-            background-color: #444;
+        .download-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(66, 165, 245, 0.4);
         }
 
-        .btn-mp3 {
-            background-color: var(--button-mp3);
-        }
-        .btn-mp3:hover {
-            background-color: var(--button-mp3-hover);
+        .download-btn.mp3 {
+            background: linear-gradient(45deg, #f57c00, #ffb74d);
         }
 
-        .btn-loading {
-            background-color: #555 !important;
+        .download-btn.mp3:hover {
+            box-shadow: 0 4px 12px rgba(255, 183, 77, 0.4);
+        }
+
+        .download-btn:disabled {
+            background: #666;
             cursor: not-allowed;
+            transform: none;
         }
 
-        @media (max-width: 600px) {
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #a0a0a0;
+        }
+
+        .empty-state-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .stats {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            animation: fadeIn 0.6s ease-out 0.3s both;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.85em;
+            color: #a0a0a0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #ff6b6b;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8em;
+            }
+
             .input-group {
                 flex-direction: column;
             }
-            .video-item {
+
+            input[type="text"] {
+                min-width: 100%;
+            }
+
+            button {
+                width: 100%;
+            }
+
+            .videos-grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 15px;
+            }
+
+            .input-section {
+                padding: 20px;
+            }
+
+            .download-buttons {
                 flex-direction: column;
-                align-items: flex-start;
             }
-            .video-thumbnail {
+
+            .download-btn {
                 width: 100%;
-                height: auto;
-                aspect-ratio: 16/9;
             }
-            .actions {
-                width: 100%;
-                margin-top: 10px;
-            }
-            .btn-download {
-                flex: 1;
-                text-align: center;
-            }
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: #808080;
+            font-size: 0.9em;
+        }
+
+        .footer a {
+            color: #ff6b6b;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .footer a:hover {
+            color: #ff9999;
         }
     </style>
 </head>
 <body>
-
     <div class="container">
-        <h1><span>YouTube</span> Playlist Downloader</h1>
-        
-        <div class="input-group">
-            <input type="text" id="playlistUrl" placeholder="YouTube Playlist URL einfügen..." autocomplete="off">
-            <button class="btn-main" id="loadBtn" onclick="loadPlaylist()">Playlist laden</button>
+        <header>
+            <h1>▶ YouTube Playlist Downloader</h1>
+            <p class="subtitle">Lade Videos aus Playlists herunter – direkt im Browser</p>
+        </header>
+
+        <div class="input-section">
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="playlistUrl" 
+                    placeholder="Gib hier deine YouTube Playlist-URL ein... (z.B. https://www.youtube.com/playlist?list=...)"
+                >
+                <button id="loadBtn">Playlist laden</button>
+            </div>
+            <div id="messageContainer"></div>
         </div>
 
-        <div class="status-message" id="statusMsg">Gib eine Playlist-URL ein und klicke auf "Playlist laden". Hinweis: Die Playlist muss öffentlich oder nicht gelistet sein.</div>
+        <div id="statsContainer"></div>
+        <div id="videosContainer"></div>
 
-        <div class="playlist-info" id="playlistInfo">
-            <div class="playlist-title" id="playlistTitleDisplay">Playlist Videos</div>
+        <div class="footer">
+            <p>💡 Tipp: Kopiere die Playlist-URL aus deinem Browser und füge sie oben ein</p>
+            <p style="margin-top: 10px; color: #666;">Diese Seite speichert keine Daten • Alle Downloads laufen über externe Services</p>
         </div>
-
-        <div class="video-list" id="videoList"></div>
     </div>
 
     <script>
-        function extractPlaylistId(url) {
-            const regExp = /[&?]list=([^#\&\?]+)/;
-            const match = url.match(regExp);
-            if (match && match[1]) return match[1];
-            if (url.startsWith("PL") && url.length >= 18) return url;
-            return null;
-        }
+        const playlistUrlInput = document.getElementById('playlistUrl');
+        const loadBtn = document.getElementById('loadBtn');
+        const videosContainer = document.getElementById('videosContainer');
+        const messageContainer = document.getElementById('messageContainer');
+        const statsContainer = document.getElementById('statsContainer');
+
+        loadBtn.addEventListener('click', loadPlaylist);
+        playlistUrlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') loadPlaylist();
+        });
 
         async function loadPlaylist() {
-            const urlInput = document.getElementById('playlistUrl').value.trim();
-            const statusMsg = document.getElementById('statusMsg');
-            const videoListContainer = document.getElementById('videoList');
-            const playlistInfo = document.getElementById('playlistInfo');
-            const loadBtn = document.getElementById('loadBtn');
-
-            const playlistId = extractPlaylistId(urlInput);
-
-            if (!playlistId) {
-                statusMsg.textContent = "Ungültige Playlist-URL. Bitte stelle sicher, dass die URL ein '?list=...' enthält.";
-                statusMsg.style.color = "#ff4444";
+            const url = playlistUrlInput.value.trim();
+            
+            if (!url) {
+                showMessage('Bitte gib eine YouTube Playlist-URL ein!', 'error');
                 return;
             }
 
-            statusMsg.textContent = "Playlist-Daten werden über alternative API geladen... Bitte kurz warten.";
-            statusMsg.style.color = "#aaaaaa";
-            videoListContainer.innerHTML = "";
-            playlistInfo.style.display = "none";
+            if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
+                showMessage('Das sieht nicht nach einer YouTube URL aus. Versuche es noch mal!', 'error');
+                return;
+            }
+
+            showLoading();
             loadBtn.disabled = true;
-            loadBtn.textContent = "Lädt...";
 
-            // Methode: Nutzt eine direkte, freie und CORS-offene API-Instanz zum Parsen von YT-Playlists
             try {
-                const response = await fetch(`https://api.v03.t-projects.xyz/api/yt/playlist?id=${playlistId}`);
+                const playlistId = extractPlaylistId(url);
                 
-                if (!response.ok) {
-                    throw new Error("Die Playlist-API meldet einen Fehler oder ist überlastet.");
+                if (!playlistId) {
+                    throw new Error('Konnte die Playlist-ID nicht extrahieren. Stelle sicher, dass die URL korrekt ist.');
                 }
 
-                const data = await response.json();
-
-                if (!data.videos || data.videos.length === 0) {
-                    throw new Error("Keine Videos in dieser Playlist gefunden. Ist die Playlist eventuell privat?");
-                }
-
-                document.getElementById('playlistTitleDisplay').textContent = `Playlist (${data.videos.length} Videos)`;
-                playlistInfo.style.display = "block";
-                statusMsg.textContent = "Playlist erfolgreich geladen! Wähle dein Format zum Herunterladen.";
-                statusMsg.style.color = "#44ff44";
-
-                data.videos.forEach(video => {
-                    const title = video.title || "Unbekannter Titel";
-                    // Nutzt das standardisierte YouTube-Vorschaubild-Format
-                    const thumbnail = `https://img.youtube.com/vi/${video.id}/mqdefault.jpg`;
-                    const videoUrl = `https://www.youtube.com/watch?v=${video.id}`;
-
-                    createVideoRow(title, thumbnail, videoUrl);
-                });
-
+                await fetchPlaylistVideos(playlistId);
+                showMessage('✅ Playlist erfolgreich geladen! Jetzt kannst du Videos downloaden.', 'success');
+                
             } catch (error) {
-                console.error(error);
-                statusMsg.textContent = `Fehler beim Laden: ${error.message}. Vergewissere dich, dass die Playlist öffentlich ist.`;
-                statusMsg.style.color = "#ff4444";
+                showMessage(`❌ Fehler: ${error.message}`, 'error');
+                videosContainer.innerHTML = '';
+                statsContainer.innerHTML = '';
             } finally {
                 loadBtn.disabled = false;
-                loadBtn.textContent = "Playlist laden";
             }
         }
 
-        function createVideoRow(title, thumbnailUrl, videoUrl) {
-            const container = document.getElementById('videoList');
-            const item = document.createElement('div');
-            item.className = 'video-item';
+        function extractPlaylistId(url) {
+            const playlistMatch = url.match(/[?&]list=([a-zA-Z0-9_-]+)/);
+            return playlistMatch ? playlistMatch[1] : null;
+        }
 
-            item.innerHTML = `
-                <img class="video-thumbnail" src="${thumbnailUrl}" alt="Thumbnail" onerror="this.src='https://via.placeholder.com/120x68?text=Kein+Bild'">
-                <div class="video-details">
-                    <div class="video-title" title="${title}">${title}</div>
-                    <div class="actions">
-                        <button class="btn-download btn-mp4" onclick="triggerDownload(this, '${videoUrl}', 'mp4')">MP4 (Video)</button>
-                        <button class="btn-download btn-mp3" onclick="triggerDownload(this, '${videoUrl}', 'mp3')">MP3 (Audio)</button>
+        async function fetchPlaylistVideos(playlistId) {
+            const response = await fetch(`https://yt-api.vercel.app/getPlaylist?id=${playlistId}`);
+            
+            if (!response.ok) {
+                throw new Error('Konnte die Playlist nicht laden. Überprüfe, ob die URL korrekt ist.');
+            }
+
+            const data = await response.json();
+            
+            if (!data.videos || data.videos.length === 0) {
+                throw new Error('Diese Playlist enthält keine Videos oder ist nicht öffentlich.');
+            }
+
+            displayVideos(data.videos);
+            displayStats(data.videos.length);
+        }
+
+        function displayVideos(videos) {
+            videosContainer.innerHTML = '';
+            
+            const grid = document.createElement('div');
+            grid.className = 'videos-grid';
+
+            videos.forEach(video => {
+                const card = createVideoCard(video);
+                grid.appendChild(card);
+            });
+
+            videosContainer.appendChild(grid);
+        }
+
+        function createVideoCard(video) {
+            const card = document.createElement('div');
+            card.className = 'video-card';
+
+            const thumbnail = video.thumbnail || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180"%3E%3Crect fill="%232a2a3e" width="320" height="180"/%3E%3C/svg%3E';
+            const title = video.title || 'Untitled';
+            const videoId = video.videoId || extractVideoIdFromUrl(video.url);
+            const duration = video.length || 'N/A';
+
+            card.innerHTML = `
+                <div class="video-thumbnail">
+                    <img src="${thumbnail}" alt="${title}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 320 180%22%3E%3Crect fill=%22%232a2a3e%22 width=%22320%22 height=%22180%22/%3E%3C/svg%3E'">
+                    <div class="play-icon">▶</div>
+                </div>
+                <div class="video-info">
+                    <div class="video-title">${title}</div>
+                    <div class="video-duration">⏱️ ${formatDuration(duration)}</div>
+                    <div class="download-buttons">
+                        <button class="download-btn" data-video-id="${videoId}" data-title="${title}" onclick="downloadVideo(this, 'mp4')">
+                            📥 MP4
+                        </button>
+                        <button class="download-btn mp3" data-video-id="${videoId}" data-title="${title}" onclick="downloadVideo(this, 'mp3')">
+                            🎵 MP3
+                        </button>
                     </div>
                 </div>
             `;
-            container.appendChild(item);
+
+            return card;
         }
 
-        async function triggerDownload(buttonElement, videoUrl, format) {
-            const originalText = buttonElement.textContent;
-            buttonElement.disabled = true;
-            buttonElement.classList.add('btn-loading');
-            buttonElement.textContent = "Verarbeite...";
+        function extractVideoIdFromUrl(url) {
+            if (!url) return '';
+            const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?]+)/);
+            return match ? match[1] : '';
+        }
+
+        function formatDuration(duration) {
+            if (!duration || duration === 'N/A') return '⏱️ Unbekannt';
+            if (typeof duration === 'number') {
+                const minutes = Math.floor(duration / 60);
+                const seconds = duration % 60;
+                return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+            return duration.toString();
+        }
+
+        async function downloadVideo(button, format) {
+            const videoId = button.dataset.videoId;
+            const title = button.dataset.title || 'video';
+            
+            if (!videoId) {
+                showMessage('❌ Video-ID konnte nicht ermittelt werden.', 'error');
+                return;
+            }
+
+            button.disabled = true;
+            const originalText = button.textContent;
+            button.textContent = '⏳ Wird vorbereitet...';
 
             try {
-                const requestBody = {
-                    url: videoUrl,
-                    videoQuality: "720",
-                    filenamePattern: "basic"
-                };
+                await tryDownloadWithCobalt(videoId, format, title);
+                button.textContent = '✅ Download gestartet!';
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.disabled = false;
+                }, 2000);
+                
+            } catch (error) {
+                button.textContent = originalText;
+                button.disabled = false;
+                showMessage(`❌ Download-Fehler: ${error.message}. Versuche einen anderen Download-Service.`, 'error');
+                
+                setTimeout(() => {
+                    if (confirm('Möchtest du Y2Mate (externer Service) verwenden?')) {
+                        window.open(`https://www.y2mate.com/youtube/${videoId}`, '_blank');
+                    }
+                }, 500);
+            }
+        }
 
-                if (format === 'mp3') {
-                    requestBody.downloadMode = "audio";
-                    requestBody.audioFormat = "mp3";
-                }
-
+        async function tryDownloadWithCobalt(videoId, format, title) {
+            const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+            
+            try {
                 const response = await fetch('https://api.cobalt.tools/api/json', {
                     method: 'POST',
                     headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     },
-                    body: JSON.stringify(requestBody)
+                    body: JSON.stringify({
+                        url: videoUrl,
+                        downloadMode: format === 'mp3' ? 'audio' : 'auto',
+                        audioFormat: format === 'mp3' ? 'mp3' : null,
+                        audioCodec: format === 'mp3' ? 'mp3' : null,
+                        filenamePattern: 'plain'
+                    })
                 });
 
-                const result = await response.json();
-
-                if (result.status === 'stream' || result.status === 'redirect') {
-                    window.open(result.url, '_blank');
-                    buttonElement.textContent = "Fertig!";
-                    setTimeout(() => {
-                        buttonElement.textContent = originalText;
-                        buttonElement.disabled = false;
-                        buttonElement.classList.remove('btn-loading');
-                    }, 3000);
-                } else if (result.status === 'error') {
-                    throw new Error(result.text || "Die Download-API hat temporäre Probleme.");
-                } else {
-                    throw new Error("Unerwartete Antwort vom Server.");
+                if (!response.ok) throw new Error('Cobalt API Fehler');
+                
+                const data = await response.json();
+                
+                if (data.url) {
+                    triggerDownload(data.url, `${sanitizeFilename(title)}.${format === 'mp3' ? 'mp3' : 'mp4'}`);
+                    return;
                 }
-
-            } catch (error) {
-                console.error(error);
-                alert(`Download-Fehler: ${error.message}\nHinweis: Manche Musikvideos sind API-seitig geschützt. Versuche es ggf. noch einmal.`);
-                buttonElement.textContent = "Fehler";
-                buttonElement.style.backgroundColor = "#ff4444";
-                setTimeout(() => {
-                    buttonElement.textContent = originalText;
-                    buttonElement.disabled = false;
-                    buttonElement.classList.remove('btn-loading');
-                    buttonElement.style.backgroundColor = "";
-                }, 4000);
+            } catch (e) {
+                // Fallback
             }
+
+            try {
+                const ytResponse = await fetch(`https://yt-api.vercel.app/dl?id=${videoId}`);
+                if (ytResponse.ok) {
+                    const ytData = await ytResponse.json();
+                    if (ytData.url) {
+                        window.open(ytData.url, '_blank');
+                        return;
+                    }
+                }
+            } catch (e) {}
+
+            throw new Error('Kein funktioniernder Download-Service verfügbar. Bitte nutze Y2Mate.');
         }
+
+        function triggerDownload(url, filename) {
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function sanitizeFilename(filename) {
+            return filename
+                .replace(/[/\\?%*:|"<>]/g, '')
+                .substring(0, 50)
+                .trim();
+        }
+
+        function displayStats(count) {
+            statsContainer.innerHTML = `
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-label">Videos geladen</div>
+                        <div class="stat-value">${count}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Status</div>
+                        <div class="stat-value">✅ Ready</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showLoading() {
+            videosContainer.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 20px;">Playlist wird geladen...</p>
+                </div>
+            `;
+            messageContainer.innerHTML = '';
+            statsContainer.innerHTML = '';
+        }
+
+        function showMessage(message, type) {
+            const div = document.createElement('div');
+            div.className = type === 'error' ? 'error-message' : 'info-message';
+            div.textContent = message;
+            messageContainer.innerHTML = '';
+            messageContainer.appendChild(div);
+        }
+
+        showMessage('ℹ️ Gib deine YouTube Playlist-URL ein und klick "Playlist laden"', 'success');
     </script>
 </body>
 </html>
