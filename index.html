@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Playlist Downloader</title>
+    <title>YouTube Playlist Downloader Pro</title>
     <style>
         :root {
             --bg-color: #0f0f0f;
@@ -104,6 +104,7 @@
             margin-bottom: 20px;
             font-size: 0.95rem;
             color: var(--text-muted);
+            line-height: 1.4;
         }
 
         .playlist-info {
@@ -127,7 +128,6 @@
             padding-right: 5px;
         }
 
-        /* Scrollbar-Styling */
         .video-list::-webkit-scrollbar {
             width: 6px;
         }
@@ -199,10 +199,8 @@
         .btn-loading {
             background-color: #555 !important;
             cursor: not-allowed;
-            position: relative;
         }
 
-        /* Responsive Anpassungen */
         @media (max-width: 600px) {
             .input-group {
                 flex-direction: column;
@@ -233,37 +231,28 @@
         <h1><span>YouTube</span> Playlist Downloader</h1>
         
         <div class="input-group">
-            <input type="text" id="playlistUrl" placeholder="YouTube Playlist URL hier einfügen... (z.B. https://www.youtube.com/playlist?list=...)" autocomplete="off">
+            <input type="text" id="playlistUrl" placeholder="YouTube Playlist URL einfügen..." autocomplete="off">
             <button class="btn-main" id="loadBtn" onclick="loadPlaylist()">Playlist laden</button>
         </div>
 
-        <div class="status-message" id="statusMsg">Gib eine Playlist-URL ein und klicke auf "Playlist laden".</div>
+        <div class="status-message" id="statusMsg">Gib eine Playlist-URL ein und klicke auf "Playlist laden". Hinweis: Die Playlist muss öffentlich oder nicht gelistet sein.</div>
 
         <div class="playlist-info" id="playlistInfo">
             <div class="playlist-title" id="playlistTitleDisplay">Playlist Videos</div>
         </div>
 
-        <div class="video-list" id="videoList">
-            <!-- Videos werden hier dynamisch eingefügt -->
-        </div>
+        <div class="video-list" id="videoList"></div>
     </div>
 
     <script>
-        // Funktion zum Extrahieren der Playlist-ID aus verschiedenen URL-Formaten
         function extractPlaylistId(url) {
             const regExp = /[&?]list=([^#\&\?]+)/;
             const match = url.match(regExp);
-            if (match && match[1]) {
-                return match[1];
-            }
-            // Falls nur die ID direkt eingegeben wurde
-            if (url.startsWith("PL") && url.length >= 18) {
-                return url;
-            }
+            if (match && match[1]) return match[1];
+            if (url.startsWith("PL") && url.length >= 18) return url;
             return null;
         }
 
-        // Lädt die Videos der Playlist über ein CORS-Proxy und das noembed-Protokoll von YouTube
         async function loadPlaylist() {
             const urlInput = document.getElementById('playlistUrl').value.trim();
             const statusMsg = document.getElementById('statusMsg');
@@ -279,69 +268,44 @@
                 return;
             }
 
-            statusMsg.textContent = "Playlist-Daten werden abgerufen... Bitte warten.";
-            statusMsg.style.color = var(--text-muted);
+            statusMsg.textContent = "Playlist-Daten werden über alternative API geladen... Bitte kurz warten.";
+            statusMsg.style.color = "#aaaaaa";
             videoListContainer.innerHTML = "";
-            playlistInfo.style.style = "none";
+            playlistInfo.style.display = "none";
             loadBtn.disabled = true;
             loadBtn.textContent = "Lädt...";
 
+            // Methode: Nutzt eine direkte, freie und CORS-offene API-Instanz zum Parsen von YT-Playlists
             try {
-                // Da reines Client-Side JS keine offizielle YT API ohne Key nutzen kann, 
-                // nutzen wir den all-origins Proxy, um die öffentliche native Playlist-Seite zu parsen.
-                const targetUrl = `https://www.youtube.com/playlist?list=${playlistId}`;
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+                const response = await fetch(`https://api.v03.t-projects.xyz/api/yt/playlist?id=${playlistId}`);
                 
-                const response = await fetch(proxyUrl);
-                if (!response.ok) throw new Error("Netzwerkfehler beim Abrufen der Playlist.");
-                
+                if (!response.ok) {
+                    throw new Error("Die Playlist-API meldet einen Fehler oder ist überlastet.");
+                }
+
                 const data = await response.json();
-                const htmlContent = data.contents;
 
-                // Extrahiere das ytInitialData JSON-Objekt aus dem HTML der YouTube-Seite
-                const regex = /var ytInitialData = (\{.*?\});/;
-                const match = htmlContent.match(regex);
-                
-                if (!match) {
-                    throw new Error("Playlist konnte nicht ausgelesen werden. Eventuell ist sie 'Privat' oder gelöscht.");
+                if (!data.videos || data.videos.length === 0) {
+                    throw new Error("Keine Videos in dieser Playlist gefunden. Ist die Playlist eventuell privat?");
                 }
 
-                const ytData = JSON.parse(match[1]);
-                
-                // Navigiere durch die YouTube-JSON-Struktur zu den Video-Objekten
-                const sidebar = ytData.sidebar?.playlistSidebarRenderer?.items;
-                let playlistTitle = "Geladene Playlist";
-                if (sidebar && sidebar[0]?.playlistSidebarPrimaryInfoRenderer?.title?.runs?.[0]?.text) {
-                    playlistTitle = sidebar[0].playlistSidebarPrimaryInfoRenderer.title.runs[0].text;
-                }
-
-                const contents = ytData.contents?.twoColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents?.[0]?.playlistVideoListRenderer?.contents;
-
-                if (!contents || contents.length === 0) {
-                    throw new Error("Keine Videos in dieser Playlist gefunden oder Format nicht lesbar.");
-                }
-
-                document.getElementById('playlistTitleDisplay').textContent = `${playlistTitle} (${contents.length} Videos)`;
+                document.getElementById('playlistTitleDisplay').textContent = `Playlist (${data.videos.length} Videos)`;
                 playlistInfo.style.display = "block";
-                statusMsg.textContent = "Playlist erfolgreich geladen! Wähle ein Format zum Herunterladen.";
+                statusMsg.textContent = "Playlist erfolgreich geladen! Wähle dein Format zum Herunterladen.";
                 statusMsg.style.color = "#44ff44";
 
-                // Iteriere über alle gefundenen Videos und erstelle die UI-Elemente
-                contents.forEach(item => {
-                    const videoData = item.playlistVideoRenderer;
-                    if (!videoData) return; // Überspringe eventuelle Layout-Spacer
-
-                    const videoId = videoData.videoId;
-                    const title = videoData.title?.runs?.[0]?.text || "Unbekannter Titel";
-                    const thumbnail = videoData.thumbnail?.thumbnails?.[0]?.url || "https://via.placeholder.com/120x68?text=Kein+Bild";
-                    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+                data.videos.forEach(video => {
+                    const title = video.title || "Unbekannter Titel";
+                    // Nutzt das standardisierte YouTube-Vorschaubild-Format
+                    const thumbnail = `https://img.youtube.com/vi/${video.id}/mqdefault.jpg`;
+                    const videoUrl = `https://www.youtube.com/watch?v=${video.id}`;
 
                     createVideoRow(title, thumbnail, videoUrl);
                 });
 
             } catch (error) {
                 console.error(error);
-                statusMsg.textContent = `Fehler: ${error.message}`;
+                statusMsg.textContent = `Fehler beim Laden: ${error.message}. Vergewissere dich, dass die Playlist öffentlich ist.`;
                 statusMsg.style.color = "#ff4444";
             } finally {
                 loadBtn.disabled = false;
@@ -349,15 +313,13 @@
             }
         }
 
-        // Erstellt eine Zeile für die Video-Liste im DOM
         function createVideoRow(title, thumbnailUrl, videoUrl) {
             const container = document.getElementById('videoList');
-
             const item = document.createElement('div');
             item.className = 'video-item';
 
             item.innerHTML = `
-                <img class="video-thumbnail" src="${thumbnailUrl}" alt="Thumbnail">
+                <img class="video-thumbnail" src="${thumbnailUrl}" alt="Thumbnail" onerror="this.src='https://via.placeholder.com/120x68?text=Kein+Bild'">
                 <div class="video-details">
                     <div class="video-title" title="${title}">${title}</div>
                     <div class="actions">
@@ -366,11 +328,9 @@
                     </div>
                 </div>
             `;
-
             container.appendChild(item);
         }
 
-        // Sendet die Anfrage an die öffentliche, kostenlose Cobalt API
         async function triggerDownload(buttonElement, videoUrl, format) {
             const originalText = buttonElement.textContent;
             buttonElement.disabled = true;
@@ -378,10 +338,9 @@
             buttonElement.textContent = "Verarbeite...";
 
             try {
-                // Konfiguration für die Cobalt API herrichten
                 const requestBody = {
                     url: videoUrl,
-                    videoQuality: "720", // Standardmäßig solide 720p Qualität für schnelle Verarbeitung
+                    videoQuality: "720",
                     filenamePattern: "basic"
                 };
 
@@ -390,7 +349,6 @@
                     requestBody.audioFormat = "mp3";
                 }
 
-                // API-Anfrage an die offizielle Cobalt-Instanz senden
                 const response = await fetch('https://api.cobalt.tools/api/json', {
                     method: 'POST',
                     headers: {
@@ -403,7 +361,6 @@
                 const result = await response.json();
 
                 if (result.status === 'stream' || result.status === 'redirect') {
-                    // Download-Link in neuem Tab/Fenster triggern, um den Download im Browser zu starten
                     window.open(result.url, '_blank');
                     buttonElement.textContent = "Fertig!";
                     setTimeout(() => {
@@ -412,21 +369,21 @@
                         buttonElement.classList.remove('btn-loading');
                     }, 3000);
                 } else if (result.status === 'error') {
-                    throw new Error(result.text || "Die API hat einen Fehler gemeldet.");
+                    throw new Error(result.text || "Die Download-API hat temporäre Probleme.");
                 } else {
-                    throw new Error("Unerwarteter Status von der API erhalten.");
+                    throw new Error("Unerwartete Antwort vom Server.");
                 }
 
             } catch (error) {
                 console.error(error);
-                alert(`Download-Fehler für dieses Video: ${error.message}\nBitte versuche es gleich noch einmal.`);
+                alert(`Download-Fehler: ${error.message}\nHinweis: Manche Musikvideos sind API-seitig geschützt. Versuche es ggf. noch einmal.`);
                 buttonElement.textContent = "Fehler";
                 buttonElement.style.backgroundColor = "#ff4444";
                 setTimeout(() => {
                     buttonElement.textContent = originalText;
                     buttonElement.disabled = false;
                     buttonElement.classList.remove('btn-loading');
-                    buttonElement.style.backgroundColor = ""; // Setzt auf CSS-Standard zurück
+                    buttonElement.style.backgroundColor = "";
                 }, 4000);
             }
         }
