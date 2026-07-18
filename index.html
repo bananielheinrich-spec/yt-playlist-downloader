@@ -3,632 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Playlist Downloader</title>
+    <title>PiTube - Lightweight Player</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        body { 
+            background-color: #121212; /* Dunkler Hintergrund, strengt den Pi weniger an */
+            color: #ffffff; 
+            font-family: sans-serif; 
+            text-align: center; 
+            margin: 0; 
+            padding: 20px; 
         }
-
-        body {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #e0e0e0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh;
-            padding: 20px;
-        }
-
         .container {
-            max-width: 1200px;
+            max-width: 800px;
             margin: 0 auto;
         }
-
-        header {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-
-        h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            background: linear-gradient(45deg, #ff0000, #ff6b6b);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .subtitle {
-            color: #a0a0a0;
-            font-size: 0.95em;
+        .controls {
             margin-bottom: 20px;
-        }
-
-        .api-setup {
-            background: rgba(255, 165, 0, 0.15);
-            border: 1px solid rgba(255, 165, 0, 0.3);
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .api-setup h3 {
-            color: #ffa500;
-            margin-bottom: 10px;
-        }
-
-        .api-setup ol {
-            margin-left: 20px;
-            font-size: 0.9em;
-            line-height: 1.8;
-            color: #e0e0e0;
-        }
-
-        .api-setup a {
-            color: #42a5f5;
-            text-decoration: none;
-        }
-
-        .api-setup a:hover {
-            text-decoration: underline;
-        }
-
-        .input-section {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 30px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }
-
-        .input-group {
             display: flex;
             gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 15px;
+            justify-content: center;
         }
-
-        input[type="text"] {
-            flex: 1;
-            min-width: 200px;
-            padding: 15px 20px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            border-radius: 10px;
-            color: #e0e0e0;
-            font-size: 1em;
-            transition: all 0.3s ease;
+        input { 
+            flex-grow: 1;
+            max-width: 500px;
+            padding: 12px; 
+            background: #2a2a2a; 
+            color: white; 
+            border: 1px solid #444; 
+            border-radius: 4px;
+            font-size: 16px;
         }
-
-        input[type="text"]:focus {
-            outline: none;
-            border-color: #ff0000;
-            background: rgba(255, 255, 255, 0.15);
-            box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
-        }
-
-        input[type="text"]::placeholder {
-            color: #808080;
-        }
-
-        button {
-            padding: 15px 35px;
-            background: linear-gradient(45deg, #ff0000, #ff6b6b);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 1em;
-            font-weight: 600;
+        button { 
+            padding: 12px 24px; 
+            background: #cc0000; 
+            color: white; 
+            border: none; 
+            border-radius: 4px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(255, 0, 0, 0.3);
-            white-space: nowrap;
+            font-weight: bold;
+            font-size: 16px;
         }
-
-        button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(255, 0, 0, 0.5);
-        }
-
-        button:disabled {
-            background: #666;
-            cursor: not-allowed;
-            opacity: 0.7;
-        }
-
-        .message {
-            padding: 15px;
-            border-radius: 5px;
-            font-size: 0.9em;
-            margin-top: 15px;
-        }
-
-        .info-message {
-            background: rgba(76, 175, 80, 0.2);
-            border-left: 4px solid #4caf50;
-            color: #90ee90;
-        }
-
-        .error-message {
-            background: rgba(244, 67, 54, 0.2);
-            border-left: 4px solid #f44336;
-            color: #ff9999;
-        }
-
-        .success-message {
-            background: rgba(76, 175, 80, 0.2);
-            border-left: 4px solid #4caf50;
-            color: #90ee90;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #a0a0a0;
-        }
-
-        .spinner {
-            display: inline-block;
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(255, 255, 255, 0.2);
-            border-top-color: #ff0000;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .videos-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 20px;
-        }
-
-        .video-card {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .video-card:hover {
-            transform: translateY(-5px);
-            border-color: rgba(255, 0, 0, 0.3);
-            box-shadow: 0 8px 25px rgba(255, 0, 0, 0.2);
-        }
-
-        .video-thumbnail {
-            width: 100%;
-            height: 160px;
-            background: #2a2a3e;
+        button:hover { background: #ff0000; }
+        
+        /* Sorgt für das richtige 16:9 Format des Videos */
+        .video-container {
             position: relative;
-            overflow: hidden;
+            width: 100%;
+            padding-bottom: 56.25%; 
+            background: #000;
         }
-
-        .video-thumbnail img {
+        #player {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
-            object-fit: cover;
-        }
-
-        .play-icon {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 50px;
-            height: 50px;
-            background: rgba(255, 0, 0, 0.8);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 20px;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .video-card:hover .play-icon {
-            opacity: 1;
-        }
-
-        .video-info {
-            padding: 15px;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .video-title {
-            font-weight: 600;
-            margin-bottom: 8px;
-            line-height: 1.4;
-            color: #e0e0e0;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            font-size: 0.95em;
-        }
-
-        .video-link {
-            font-size: 0.8em;
-            color: #42a5f5;
-            margin-bottom: 12px;
-            word-break: break-all;
-        }
-
-        .download-buttons {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .download-btn {
-            flex: 1;
-            min-width: 70px;
-            padding: 8px 12px;
-            font-size: 0.8em;
-            background: linear-gradient(45deg, #1976d2, #42a5f5);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .download-btn:hover:not(:disabled) {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(66, 165, 245, 0.4);
-        }
-
-        .download-btn.mp3 {
-            background: linear-gradient(45deg, #f57c00, #ffb74d);
-        }
-
-        .download-btn:disabled {
-            background: #666;
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-
-        .stats {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 30px;
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-
-        .stat-item {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .stat-label {
-            font-size: 0.85em;
-            color: #a0a0a0;
-            text-transform: uppercase;
-        }
-
-        .stat-value {
-            font-size: 1.5em;
-            font-weight: 700;
-            color: #ff6b6b;
-        }
-
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 1.8em;
-            }
-
-            .input-group {
-                flex-direction: column;
-            }
-
-            input[type="text"] {
-                min-width: 100%;
-            }
-
-            button {
-                width: 100%;
-            }
-
-            .videos-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .download-buttons {
-                flex-direction: column;
-            }
-
-            .download-btn {
-                width: 100%;
-            }
-        }
-
-        .footer {
-            text-align: center;
-            margin-top: 50px;
-            padding-top: 30px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            color: #808080;
-            font-size: 0.9em;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>▶ YouTube Playlist Downloader</h1>
-            <p class="subtitle">Lade Videos herunter – speichern auf deinem Gerät</p>
-        </header>
-
-        <div class="api-setup">
-            <h3>⚙️ Setup (einmalig):</h3>
-            <ol>
-                <li>Öffne <a href="https://console.developers.google.com/" target="_blank">Google Cloud Console</a></li>
-                <li>Erstelle ein neues Projekt</li>
-                <li>Aktiviere "YouTube Data API v3"</li>
-                <li>Erstelle einen API-Key (Credentials → API Key)</li>
-                <li>Kopiere deinen API-Key unten ein</li>
-            </ol>
+        <h1>PiTube für Raspberry Pi 3</h1>
+        
+        <div class="controls">
+            <input type="text" id="videoInput" placeholder="YouTube-Link hier einfügen (z.B. https://youtu.be/...)">
+            <button onclick="loadVideo()">Starten</button>
         </div>
-
-        <div class="input-section">
-            <div class="input-group">
-                <input 
-                    type="text" 
-                    id="apiKey" 
-                    placeholder="Dein YouTube API Key eingeben..."
-                >
-                <button id="saveApiBtn">💾 API speichern</button>
-            </div>
-
-            <div class="input-group">
-                <input 
-                    type="text" 
-                    id="playlistUrl" 
-                    placeholder="YouTube Playlist URL eingeben..."
-                >
-                <button id="loadBtn">🔍 Laden</button>
-            </div>
-            <div id="messageContainer"></div>
-        </div>
-
-        <div id="statsContainer"></div>
-        <div id="videosContainer"></div>
-
-        <div class="footer">
-            <p>📥 Videos werden direkt auf deinem Gerät gespeichert</p>
-            <p style="margin-top: 10px; color: #666;">Über y2mate.com zum Herunterladen</p>
+        
+        <div class="video-container">
+            <div id="player"></div>
         </div>
     </div>
 
-    <script>
-        const apiKeyInput = document.getElementById('apiKey');
-        const saveApiBtn = document.getElementById('saveApiBtn');
-        const playlistUrlInput = document.getElementById('playlistUrl');
-        const loadBtn = document.getElementById('loadBtn');
-        const videosContainer = document.getElementById('videosContainer');
-        const messageContainer = document.getElementById('messageContainer');
-        const statsContainer = document.getElementById('statsContainer');
-
-        // API Key aus LocalStorage laden
-        let apiKey = localStorage.getItem('youtubeApiKey') || '';
-        if (apiKey) {
-            apiKeyInput.value = apiKey;
-            showMessage('✅ API Key geladen', 'success');
-        }
-
-        saveApiBtn.addEventListener('click', () => {
-            const key = apiKeyInput.value.trim();
-            if (!key) {
-                showMessage('❌ Bitte einen API Key eingeben', 'error');
-                return;
-            }
-            localStorage.setItem('youtubeApiKey', key);
-            apiKey = key;
-            showMessage('✅ API Key gespeichert!', 'success');
-        });
-
-        loadBtn.addEventListener('click', loadPlaylist);
-        playlistUrlInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') loadPlaylist();
-        });
-
-        async function loadPlaylist() {
-            if (!apiKey) {
-                showMessage('❌ Bitte zuerst einen API Key eingeben und speichern', 'error');
-                return;
-            }
-
-            const url = playlistUrlInput.value.trim();
-            if (!url) {
-                showMessage('❌ Bitte eine URL eingeben', 'error');
-                return;
-            }
-
-            const playlistId = extractPlaylistId(url);
-            if (!playlistId) {
-                showMessage('❌ Ungültige Playlist-URL', 'error');
-                return;
-            }
-
-            showLoading();
-            loadBtn.disabled = true;
-
-            try {
-                const videos = await fetchPlaylistVideos(playlistId);
-                displayVideos(videos);
-                displayStats(videos.length);
-                showMessage(`✅ ${videos.length} Videos geladen!`, 'success');
-            } catch (error) {
-                showMessage(`❌ Fehler: ${error.message}`, 'error');
-                videosContainer.innerHTML = '';
-                statsContainer.innerHTML = '';
-            } finally {
-                loadBtn.disabled = false;
-            }
-        }
-
-        function extractPlaylistId(url) {
-            const match = url.match(/[?&]list=([a-zA-Z0-9_-]+)/);
-            return match ? match[1] : null;
-        }
-
-        async function fetchPlaylistVideos(playlistId) {
-            const videos = [];
-            let nextPageToken = '';
-
-            do {
-                const url = `https://www.googleapis.com/youtube/v3/playlistItems?` +
-                    `part=snippet,contentDetails` +
-                    `&maxResults=50` +
-                    `&playlistId=${playlistId}` +
-                    `&key=${apiKey}` +
-                    (nextPageToken ? `&pageToken=${nextPageToken}` : '');
-
-                const response = await fetch(url);
-                
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error.message || 'API Fehler');
-                }
-
-                const data = await response.json();
-
-                if (data.items) {
-                    data.items.forEach(item => {
-                        if (item.snippet && item.contentDetails) {
-                            videos.push({
-                                videoId: item.contentDetails.videoId,
-                                title: item.snippet.title,
-                                thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.default?.url
-                            });
-                        }
-                    });
-                }
-
-                nextPageToken = data.nextPageToken || '';
-            } while (nextPageToken && videos.length < 500);
-
-            return videos;
-        }
-
-        function displayVideos(videos) {
-            videosContainer.innerHTML = '';
-            const grid = document.createElement('div');
-            grid.className = 'videos-grid';
-
-            videos.forEach(video => {
-                grid.appendChild(createVideoCard(video));
-            });
-
-            videosContainer.appendChild(grid);
-        }
-
-        function createVideoCard(video) {
-            const card = document.createElement('div');
-            card.className = 'video-card';
-
-            card.innerHTML = `
-                <div class="video-thumbnail">
-                    <img src="${video.thumbnail}" alt="${video.title}">
-                    <div class="play-icon">▶</div>
-                </div>
-                <div class="video-info">
-                    <div class="video-title">${escapeHtml(video.title)}</div>
-                    <div class="video-link">🎬 ${video.videoId}</div>
-                    <div class="download-buttons">
-                        <button class="download-btn" onclick="downloadVideo('${video.videoId}', '${escapeHtml(video.title)}', 'mp4')">
-                            📥 MP4
-                        </button>
-                        <button class="download-btn mp3" onclick="downloadVideo('${video.videoId}', '${escapeHtml(video.title)}', 'mp3')">
-                            🎵 MP3
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            return card;
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        async function downloadVideo(videoId, title, format) {
-            const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
-            const filename = sanitizeFilename(title);
-
-            showMessage(`⏳ Leite zum Download weiter für: ${title}`, 'info');
-
-            // Öffne y2mate in neuem Tab für den Download
-            setTimeout(() => {
-                window.open(`https://www.y2mate.com/en/youtube/${videoId}`, '_blank');
-                showMessage(`✅ Y2Mate wurde geöffnet. Wähle dort ${format.toUpperCase()} und lade herunter!`, 'success');
-            }, 500);
-        }
-
-        function sanitizeFilename(text) {
-            return text
-                .replace(/[/\\?%*:|"<>]/g, '')
-                .substring(0, 50)
-                .trim() || 'video';
-        }
-
-        function displayStats(count) {
-            statsContainer.innerHTML = `
-                <div class="stats">
-                    <div class="stat-item">
-                        <div class="stat-label">📹 Videos</div>
-                        <div class="stat-value">${count}</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Status</div>
-                        <div class="stat-value">✅ Ready</div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function showLoading() {
-            videosContainer.innerHTML = `
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p style="margin-top: 20px;">Playlist wird geladen...</p>
-                </div>
-            `;
-            messageContainer.innerHTML = '';
-            statsContainer.innerHTML = '';
-        }
-
-        function showMessage(message, type) {
-            const div = document.createElement('div');
-            div.className = `message ${type}-message`;
-            div.textContent = message;
-            messageContainer.innerHTML = '';
-            messageContainer.appendChild(div);
-        }
-
-        showMessage('ℹ️ Schritt 1: API Key eingeben | Schritt 2: Playlist URL eingeben', 'info');
-    </script>
+    <script src="app.js"></script>
 </body>
 </html>
