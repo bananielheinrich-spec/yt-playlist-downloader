@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Luau lernen (Roblox Edition)</title>
+    <title>Learn Luau (Roblox Edition)</title>
     <style>
         :root {
             --bg-color: #1e1e2e;
             --panel-bg: #252538;
             --text-color: #cdd6f4;
-            --accent-color: #89b4fa; /* Roblox Studio Blau-Touch */
+            --accent-color: #89b4fa;
             --success-color: #a6e3a1;
             --error-color: #f38ba8;
             --viewport-bg: #181825;
@@ -31,7 +31,6 @@
             overflow: hidden;
         }
 
-        /* Header & Avatar */
         header {
             background-color: var(--panel-bg);
             padding: 20px;
@@ -81,7 +80,7 @@
             width: 65px;
             height: 65px;
             background-color: var(--accent-color);
-            border-radius: 20%; /* Etwas eckiger, wie ein Roblox-Kopf */
+            border-radius: 20%;
             position: relative;
             animation: float 3s ease-in-out infinite;
             box-shadow: 0 0 15px rgba(137, 180, 250, 0.4);
@@ -122,7 +121,12 @@
             font-weight: bold;
         }
 
-        /* Arbeitsbereich */
+        .level-counter {
+            font-size: 0.85rem;
+            color: #6c7086;
+            margin-top: 5px;
+        }
+
         .main-container {
             display: flex;
             flex: 1;
@@ -145,9 +149,12 @@
             gap: 10px;
         }
 
-        h2 { color: var(--accent-color); font-size: 1.1rem; }
+        h2 { 
+            color: var(--accent-color); 
+            font-size: 1.1rem; 
+            margin: 5px 0;
+        }
 
-        /* Code Editor */
         textarea {
             width: 100%;
             flex: 1;
@@ -163,7 +170,9 @@
             line-height: 1.4;
         }
 
-        textarea:focus { border-color: var(--accent-color); }
+        textarea:focus { 
+            border-color: var(--accent-color); 
+        }
 
         button {
             background-color: var(--accent-color);
@@ -177,11 +186,16 @@
             transition: 0.2s;
         }
 
-        button:hover { filter: brightness(1.2); }
+        button:hover { 
+            filter: brightness(1.2); 
+        }
 
-        /* Roblox Viewport (GUI Simulator) */
+        button:active {
+            transform: scale(0.98);
+        }
+
         .viewport-container {
-            flex: 2; /* Nimmt mehr Platz ein */
+            flex: 2;
             background-image: 
                 linear-gradient(#252538 1px, transparent 1px),
                 linear-gradient(90deg, #252538 1px, transparent 1px);
@@ -203,7 +217,6 @@
             z-index: 10;
         }
 
-        /* Konsole */
         .output-box {
             flex: 1;
             background-color: #11111b;
@@ -211,82 +224,247 @@
             border-radius: 8px;
             padding: 15px;
             font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.95rem;
             white-space: pre-wrap;
             overflow-y: auto;
+            word-wrap: break-word;
         }
 
         .success { color: var(--success-color); }
         .error { color: var(--error-color); }
         .system { color: #89dceb; }
+        .warning { color: #f9e2af; }
+
+        /* GUI Elements in Viewport */
+        .gui-frame {
+            position: absolute;
+            border: 1px solid #555;
+            overflow: hidden;
+        }
+
+        .gui-text-label {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', sans-serif;
+            overflow: hidden;
+            border: 1px solid #444;
+        }
+
+        .gui-button {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', sans-serif;
+            border: 2px solid #444;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.1s;
+        }
+
+        .gui-button:hover {
+            filter: brightness(1.1);
+        }
+
+        .gui-button:active {
+            transform: scale(0.98);
+        }
     </style>
 </head>
 <body>
 
     <header>
         <div class="teacher-speech" id="bubble">
-            Lade Luau-Lektionen...
+            Loading lessons...
         </div>
         <div class="avatar-container">
             <div class="avatar" id="avatar"></div>
             <div class="avatar-name">Dev-Bot</div>
+            <div class="level-counter">Level <span id="levelCounter">1</span></div>
         </div>
     </header>
 
     <div class="main-container">
-        <!-- Editor -->
         <div class="left-panel">
-            <h2>Luau Skript:</h2>
-            <textarea id="codeEditor" spellcheck="false">print("Hallo Roblox!")</textarea>
-            <button onclick="runCode()">▶ Skript ausführen</button>
+            <h2>Luau Script:</h2>
+            <textarea id="codeEditor" spellcheck="false">print("Hello Roblox!")</textarea>
+            <button onclick="runCode()">▶ Execute Script</button>
         </div>
 
-        <!-- Visueller Output & Konsole -->
         <div class="right-panel">
             <h2>Roblox Screen / GUI:</h2>
             <div class="viewport-container" id="viewport">
                 <span class="viewport-title">StarterGui Viewport</span>
-                <!-- Hier spawnen die simulierten Roblox GUIs -->
             </div>
             
-            <h2>Output (Konsole):</h2>
-            <div class="output-box" id="output">Warte auf Skript...</div>
+            <h2>Output Console:</h2>
+            <div class="output-box" id="output">Waiting for script...</div>
         </div>
     </div>
 
     <script>
-        // Die Lektionen-Datenbank
+        // Comprehensive lessons with proper checks
         const lessons = [
             {
-                text: "Willkommen im Studio! Lass uns testen, ob die Konsole geht. Nutze <code>print(\"Dein Text\")</code> um etwas auszugeben.",
-                check: (code, out, html) => code.includes("print") && out.trim().length > 0
+                title: "Print Basics",
+                text: "Welcome to Luau! Let's start with the basics. Use <code>print(\"Hello World\")</code> to output something to the console.",
+                hint: "Type: print(\"your text here\")",
+                check: (code, output, viewport) => {
+                    return code.includes('print(') && output.trim().length > 0 && !output.includes('Syntax Error');
+                }
             },
             {
-                text: "Sehr gut! Variablen speichern Daten. Erstelle eine Variable: <code>local spieler = \"Daniel\"</code> und printe sie aus.",
-                check: (code, out, html) => code.includes("local") && code.includes("spieler") && out.includes("Daniel")
+                title: "Variables",
+                text: "Great! Now let's use variables. Create a variable: <code>local player = \"Daniel\"</code> and then <code>print(player)</code>",
+                hint: "Remember: local variableName = value",
+                check: (code, output, viewport) => {
+                    return code.includes('local player') && code.includes('print(player)') && output.includes('Daniel');
+                }
             },
             {
-                text: "Perfekt. Jetzt probieren wir einen Loop (Schleife). Zähle von 1 bis 5: <br><code>for i = 1, 5 do<br>&nbsp;&nbsp;print(i)<br>end</code>",
-                check: (code, out, html) => code.includes("for") && out.includes("1") && out.includes("5")
+                title: "Numbers & Math",
+                text: "Perfect! Now let's use numbers. Create: <code>local health = 100</code> and <code>local damage = 25</code>. Then print: <code>print(health - damage)</code>",
+                hint: "Math operations: +, -, *, /",
+                check: (code, output, viewport) => {
+                    return code.includes('local health = 100') && code.includes('local damage = 25') && output.includes('75');
+                }
             },
             {
-                text: "Stark! Jetzt if-Bedingungen. Erstelle <code>local admin = true</code>. Schreibe danach: <br><code>if admin then print(\"Willkommen\") end</code>",
-                check: (code, out, html) => code.includes("if") && code.includes("then") && out.includes("Willkommen")
+                title: "For Loops",
+                text: "Excellent! Loops are powerful. Create a loop:<br><code>for i = 1, 5 do<br>&nbsp;&nbsp;print(i)<br>end</code>",
+                hint: "Loops repeat code multiple times",
+                check: (code, output, viewport) => {
+                    return code.includes('for i = 1, 5 do') && output.includes('1') && output.includes('5');
+                }
             },
             {
-                text: "Jetzt wird's visuell! Wir machen ein GUI. Erstelle einen Frame im Viewport rechts:<br><code>local frame = Instance.new(\"Frame\")</code>",
-                check: (code, out, html) => html.includes("background-color: white") || code.includes("Instance.new(\"Frame\")")
+                title: "While Loops",
+                text: "Good! Now try a while loop:<br><code>local count = 0<br>while count < 3 do<br>&nbsp;&nbsp;print(count)<br>&nbsp;&nbsp;count = count + 1<br>end</code>",
+                hint: "While loops continue while a condition is true",
+                check: (code, output, viewport) => {
+                    return code.includes('while') && code.includes('count < 3') && output.includes('0') && output.includes('2');
+                }
             },
             {
-                text: "Klasse, der Frame ist da! Lass uns die Farbe ändern. Füge das deinem Skript hinzu:<br><code>frame.BackgroundColor3 = Color3.fromRGB(255, 0, 0)</code>",
-                check: (code, out, html) => code.includes("BackgroundColor3") && code.includes("Color3")
+                title: "If Statements",
+                text: "Nice! Time for conditionals. Try:<br><code>local level = 10<br>if level >= 10 then<br>&nbsp;&nbsp;print(\"You are level 10!\")<br>end</code>",
+                hint: "if conditions then ... end",
+                check: (code, output, viewport) => {
+                    return code.includes('if level >= 10 then') && output.includes('You are level 10!');
+                }
             },
             {
-                text: "Super! Jetzt noch ein Text-Label. Ersetze Frame durch TextLabel und gib ihm einen Text:<br><code>local text = Instance.new(\"TextLabel\")<br>text.Text = \"Mein Simulator\"</code>",
-                check: (code, out, html) => code.includes("Instance.new(\"TextLabel\")") && code.includes("Text =")
+                title: "If-Else Statements",
+                text: "Great! Now try if-else:<br><code>local isAdmin = false<br>if isAdmin then<br>&nbsp;&nbsp;print(\"Admin mode on\")<br>else<br>&nbsp;&nbsp;print(\"User mode\")<br>end</code>",
+                hint: "else clause runs when if is false",
+                check: (code, output, viewport) => {
+                    return code.includes('if isAdmin then') && code.includes('else') && output.includes('User mode');
+                }
             },
             {
-                text: "Du bist ein Meister-Scripter! Du hast die Basics drauf. Ab hier kannst du frei programmieren, GUIs bauen und testen!",
-                check: () => false // Sandbox Modus
+                title: "Tables (Arrays)",
+                text: "Nice! Tables store multiple values:<br><code>local colors = {\"red\", \"blue\", \"green\"}<br>print(colors[1])</code>",
+                hint: "Tables use {} and indexing starts at 1",
+                check: (code, output, viewport) => {
+                    return code.includes('local colors') && code.includes('{') && output.includes('red');
+                }
+            },
+            {
+                title: "Table Loops",
+                text: "Perfect! Loop through tables:<br><code>local fruits = {\"apple\", \"banana\", \"orange\"}<br>for i, fruit in ipairs(fruits) do<br>&nbsp;&nbsp;print(fruit)<br>end</code>",
+                hint: "ipairs() iterates through table values",
+                check: (code, output, viewport) => {
+                    return code.includes('ipairs(fruits)') && output.includes('apple') && output.includes('banana');
+                }
+            },
+            {
+                title: "Functions",
+                text: "Excellent! Functions reuse code:<br><code>local function greet(name)<br>&nbsp;&nbsp;print(\"Hello, \" .. name)<br>end<br>greet(\"World\")</code>",
+                hint: ".. is the string concatenation operator",
+                check: (code, output, viewport) => {
+                    return code.includes('local function greet') && output.includes('Hello, World');
+                }
+            },
+            {
+                title: "Create a Frame GUI",
+                text: "Now for the visual part! Create a Frame in the viewport:<br><code>local frame = Instance.new(\"Frame\")<br>frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)<br>frame.Size = UDim2.new(0, 200, 0, 150)<br>frame.Position = UDim2.new(0, 50, 0, 50)<br>frame.Parent = game.StarterGui</code>",
+                hint: "Instance.new() creates GUI objects",
+                check: (code, output, viewport) => {
+                    return code.includes('Instance.new(\"Frame\")') && viewport.querySelector('.gui-frame') !== null;
+                }
+            },
+            {
+                title: "Frame with Color",
+                text: "Perfect! Now let's change the frame color to red:<br><code>local frame = Instance.new(\"Frame\")<br>frame.BackgroundColor3 = Color3.fromRGB(255, 0, 0)<br>frame.Size = UDim2.new(0, 200, 0, 150)<br>frame.Position = UDim2.new(0, 50, 0, 50)<br>frame.Parent = game.StarterGui</code>",
+                hint: "RGB values: 255 = max, 0 = min",
+                check: (code, output, viewport) => {
+                    let frame = viewport.querySelector('.gui-frame');
+                    return frame !== null && code.includes('Color3.fromRGB(255, 0, 0)');
+                }
+            },
+            {
+                title: "Add a TextLabel",
+                text: "Great! Add text to your GUI:<br><code>local label = Instance.new(\"TextLabel\")<br>label.Text = \"Hello GUI!\"<br>label.BackgroundColor3 = Color3.fromRGB(100, 100, 255)<br>label.Size = UDim2.new(0, 150, 0, 50)<br>label.Position = UDim2.new(0, 125, 0, 75)<br>label.Parent = game.StarterGui</code>",
+                hint: "TextLabel displays text on the screen",
+                check: (code, output, viewport) => {
+                    return code.includes('Instance.new(\"TextLabel\")') && code.includes('label.Text = \"Hello GUI!\"') && 
+                           viewport.querySelector('.gui-text-label') !== null;
+                }
+            },
+            {
+                title: "Create a Button",
+                text: "Awesome! Let's make a clickable button:<br><code>local button = Instance.new(\"TextButton\")<br>button.Text = \"Click Me!\"<br>button.BackgroundColor3 = Color3.fromRGB(50, 200, 50)<br>button.Size = UDim2.new(0, 120, 0, 40)<br>button.Position = UDim2.new(0, 200, 0, 200)<br>button.Parent = game.StarterGui<br>print(\"Button created\")</code>",
+                hint: "TextButton is clickable!",
+                check: (code, output, viewport) => {
+                    return code.includes('Instance.new(\"TextButton\")') && output.includes('Button created') &&
+                           viewport.querySelector('.gui-button') !== null;
+                }
+            },
+            {
+                title: "Multiple GUI Elements",
+                text: "Perfect! Create multiple elements:<br><code>local frame = Instance.new(\"Frame\")<br>frame.BackgroundColor3 = Color3.fromRGB(200, 200, 200)<br>frame.Size = UDim2.new(0, 300, 0, 200)<br>frame.Position = UDim2.new(0, 30, 0, 30)<br>frame.Parent = game.StarterGui<br><br>local title = Instance.new(\"TextLabel\")<br>title.Text = \"Welcome!\"<br>title.BackgroundColor3 = Color3.fromRGB(0, 0, 255)<br>title.Size = UDim2.new(0, 300, 0, 50)<br>title.Position = UDim2.new(0, 30, 0, 30)<br>title.Parent = game.StarterGui<br>print(\"UI Built\")</code>",
+                hint: "Build complex UIs step by step",
+                check: (code, output, viewport) => {
+                    return code.includes('Instance.new(\"Frame\")') && code.includes('Instance.new(\"TextLabel\")') &&
+                           output.includes('UI Built') && viewport.querySelectorAll('.gui-frame, .gui-text-label').length >= 2;
+                }
+            },
+            {
+                title: "Practice: Build a Complete Form",
+                text: "Challenge! Build a login form with:<br>1. A frame container<br>2. A title label \"Login\"<br>3. A username label \"Username:\"<br>4. A password label \"Password:\"<br>5. A login button<br>Use different colors for each!",
+                hint: "Create multiple GUI elements with different colors and positions",
+                check: (code, output, viewport) => {
+                    let hasFrame = code.includes('Instance.new(\"Frame\")');
+                    let hasLabel = code.includes('Instance.new(\"TextLabel\")');
+                    let hasButton = code.includes('Instance.new(\"TextButton\")');
+                    let elements = viewport.querySelectorAll('.gui-frame, .gui-text-label, .gui-button').length;
+                    return hasFrame && hasLabel && hasButton && elements >= 5;
+                }
+            },
+            {
+                title: "String Methods",
+                text: "Strings are powerful! Try:<br><code>local text = \"Luau is awesome\"<br>print(string.upper(text))<br>print(string.len(text))<br>print(string.sub(text, 1, 4))</code>",
+                hint: "string.upper(), string.len(), string.sub() for manipulation",
+                check: (code, output, viewport) => {
+                    return code.includes('string.upper') && code.includes('string.len') && 
+                           output.includes('LUAU') && output.includes('14');
+                }
+            },
+            {
+                title: "Table Methods",
+                text: "Table manipulation:<br><code>local numbers = {10, 20, 30}<br>table.insert(numbers, 40)<br>for i, num in ipairs(numbers) do<br>&nbsp;&nbsp;print(num)<br>end</code>",
+                hint: "table.insert() adds elements",
+                check: (code, output, viewport) => {
+                    return code.includes('table.insert') && output.includes('40');
+                }
+            },
+            {
+                title: "Congratulations!",
+                text: "🎉 You've mastered Luau! You learned: variables, loops, conditionals, functions, tables, strings, and GUI creation! Now you can create amazing Roblox games. Keep practicing!",
+                hint: "You're a Luau master!",
+                check: () => false // Final lesson - no check
             }
         ];
 
@@ -295,154 +473,547 @@
         const avatar = document.getElementById('avatar');
         const outputBox = document.getElementById('output');
         const viewport = document.getElementById('viewport');
+        const levelCounter = document.getElementById('levelCounter');
         
-        // Start Lektion setzen
-        bubble.innerHTML = lessons[currentLevel].text;
+        let executedCode = {}; // Track code execution
+
+        function updateLesson() {
+            const lesson = lessons[currentLevel];
+            if (lesson) {
+                levelCounter.textContent = currentLevel + 1;
+                bubble.innerHTML = lesson.text;
+            }
+        }
+
+        updateLesson();
+
+        function stripHtml(html) {
+            const tmp = document.createElement('DIV');
+            tmp.innerHTML = html;
+            return tmp.textContent || tmp.innerText || '';
+        }
 
         function runCode() {
             const code = document.getElementById('codeEditor').value;
             
-            // Konsole & Viewport zurücksetzen
             outputBox.innerHTML = "";
             let consoleLogs = [];
             
-            // Viewport resetten, aber den Titel behalten
             viewport.innerHTML = '<span class="viewport-title">StarterGui Viewport</span>';
             
-            let instances = {}; // Speichert unsere simulierten GUI-Elemente
+            let instances = {};
+            let variables = {};
 
             try {
                 const lines = code.split('\n');
 
-                // Einfacher Parser für Luau-Syntax
+                // First pass: collect variables
                 lines.forEach(line => {
                     line = line.trim();
-                    if(line === "") return;
+                    if (!line || line.startsWith('--')) return;
 
-                    // 1. FOR-Schleife simulieren
+                    const varMatch = line.match(/local\s+(\w+)\s*=\s*(.+)/);
+                    if (varMatch) {
+                        let varName = varMatch[1];
+                        let value = varMatch[2].trim();
+                        
+                        // Parse values
+                        if (value.startsWith('"') && value.endsWith('"')) {
+                            variables[varName] = value.slice(1, -1);
+                        } else if (!isNaN(value)) {
+                            variables[varName] = parseInt(value);
+                        } else if (value === 'true') {
+                            variables[varName] = true;
+                        } else if (value === 'false') {
+                            variables[varName] = false;
+                        } else if (value.startsWith('{')) {
+                            variables[varName] = 'table';
+                        }
+                    }
+                });
+
+                // Parse and execute
+                let i = 0;
+                while (i < lines.length) {
+                    let line = lines[i].trim();
+                    i++;
+
+                    if (!line || line.startsWith('--')) continue;
+
+                    // FOR LOOP
                     const forMatch = line.match(/for\s+(\w+)\s*=\s*(\d+)\s*,\s*(\d+)\s*do/);
-                    if (forMatch && code.includes("print(" + forMatch[1] + ")")) {
+                    if (forMatch) {
+                        let loopVar = forMatch[1];
                         let start = parseInt(forMatch[2]);
                         let end = parseInt(forMatch[3]);
-                        for(let i=start; i<=end; i++) {
-                            consoleLogs.push(i);
+
+                        let bodyLines = [];
+                        while (i < lines.length && !lines[i].trim().startsWith('end')) {
+                            bodyLines.push(lines[i]);
+                            i++;
                         }
+                        i++; // skip 'end'
+
+                        for (let iter = start; iter <= end; iter++) {
+                            variables[loopVar] = iter;
+                            bodyLines.forEach(bodyLine => {
+                                bodyLine = bodyLine.trim();
+                                if (bodyLine.startsWith('print(')) {
+                                    let content = bodyLine.match(/print\((.+)\)/);
+                                    if (content) {
+                                        let text = content[1].replace(/["']/g, '').trim();
+                                        if (variables[text] !== undefined) {
+                                            text = variables[text];
+                                        }
+                                        consoleLogs.push(text);
+                                    }
+                                }
+                            });
+                        }
+                        continue;
                     }
 
-                    // 2. IF-Bedingung simulieren (sehr simpel)
-                    if (line.includes("if ") && line.includes("then") && line.includes("print(")) {
-                        let printContent = line.match(/print\("([^"]+)"\)/);
-                        if (printContent) consoleLogs.push(printContent[1]);
+                    // WHILE LOOP
+                    const whileMatch = line.match(/while\s+(.+)\s+do/);
+                    if (whileMatch) {
+                        let condition = whileMatch[1].trim();
+                        let bodyLines = [];
+                        while (i < lines.length && !lines[i].trim().startsWith('end')) {
+                            bodyLines.push(lines[i]);
+                            i++;
+                        }
+                        i++; // skip 'end'
+
+                        let iterations = 0;
+                        while (iterations < 1000) {
+                            let condMet = evaluateCondition(condition, variables);
+                            if (!condMet) break;
+
+                            bodyLines.forEach(bodyLine => {
+                                bodyLine = bodyLine.trim();
+                                
+                                // Variable assignment
+                                const assignMatch = bodyLine.match(/(\w+)\s*=\s*(.+)/);
+                                if (assignMatch) {
+                                    let varName = assignMatch[1];
+                                    let expr = assignMatch[2].trim();
+                                    variables[varName] = evaluateExpression(expr, variables);
+                                }
+
+                                // Print
+                                if (bodyLine.startsWith('print(')) {
+                                    let content = bodyLine.match(/print\((.+)\)/);
+                                    if (content) {
+                                        let text = content[1].replace(/["']/g, '').trim();
+                                        if (variables[text] !== undefined) {
+                                            text = variables[text];
+                                        }
+                                        consoleLogs.push(text);
+                                    }
+                                }
+                            });
+                            iterations++;
+                        }
+                        continue;
                     }
 
-                    // 3. Normales Print
-                    if (line.startsWith("print(") && !line.includes("if ") && !line.includes("for ")) {
-                        let content = line.match(/\(([^)]+)\)/);
+                    // IF STATEMENT
+                    if (line.startsWith('if ')) {
+                        let condition = line.match(/if\s+(.+)\s+then/);
+                        if (condition) {
+                            let condMet = evaluateCondition(condition[1].trim(), variables);
+                            let bodyLines = [];
+                            let elseFound = false;
+                            let elseLines = [];
+
+                            while (i < lines.length) {
+                                let currentLine = lines[i].trim();
+                                if (currentLine === 'end') {
+                                    i++;
+                                    break;
+                                }
+                                if (currentLine === 'else') {
+                                    elseFound = true;
+                                    i++;
+                                    continue;
+                                }
+                                if (!elseFound) {
+                                    bodyLines.push(lines[i]);
+                                } else {
+                                    elseLines.push(lines[i]);
+                                }
+                                i++;
+                            }
+
+                            let linesToExecute = condMet ? bodyLines : elseLines;
+                            linesToExecute.forEach(execLine => {
+                                execLine = execLine.trim();
+                                if (execLine.startsWith('print(')) {
+                                    let content = execLine.match(/print\((.+)\)/);
+                                    if (content) {
+                                        let text = content[1].replace(/["']/g, '').trim();
+                                        if (variables[text] !== undefined) {
+                                            text = variables[text];
+                                        }
+                                        consoleLogs.push(text);
+                                    }
+                                }
+                            });
+                        }
+                        continue;
+                    }
+
+                    // PRINT STATEMENT
+                    if (line.startsWith('print(')) {
+                        let content = line.match(/print\((.+)\)/);
                         if (content) {
-                            let text = content[1].replace(/["']/g, "");
-                            // Check ob es eine Variable ist (rudimentär)
-                            let isVar = code.match(new RegExp(`local\\s+${text}\\s*=\\s*"([^"]+)"`));
-                            if (isVar) text = isVar[1];
-                            
+                            let text = content[1].replace(/["']/g, '').trim();
+                            if (variables[text] !== undefined) {
+                                text = variables[text];
+                            }
                             consoleLogs.push(text);
                         }
+                        continue;
                     }
 
-                    // ==========================================
-                    // ROBLOX GUI SIMULATOR ENGINE
-                    // ==========================================
+                    // STRING OPERATIONS
+                    if (line.includes('string.upper')) {
+                        let match = line.match(/string\.upper\((\w+)\)/);
+                        if (match) {
+                            let varName = match[1];
+                            if (variables[varName]) {
+                                consoleLogs.push(String(variables[varName]).toUpperCase());
+                            }
+                        }
+                    }
+                    if (line.includes('string.len')) {
+                        let match = line.match(/string\.len\((\w+)\)/);
+                        if (match) {
+                            let varName = match[1];
+                            if (variables[varName]) {
+                                consoleLogs.push(String(variables[varName]).length);
+                            }
+                        }
+                    }
+                    if (line.includes('string.sub')) {
+                        let match = line.match(/string\.sub\((\w+),\s*(\d+),\s*(\d+)\)/);
+                        if (match) {
+                            let varName = match[1];
+                            let start = parseInt(match[2]) - 1;
+                            let end = parseInt(match[3]);
+                            if (variables[varName]) {
+                                consoleLogs.push(String(variables[varName]).substr(start, end - start));
+                            }
+                        }
+                    }
 
-                    // Instance.new() erkennen
-                    let instanceMatch = line.match(/local\s+(\w+)\s*=\s*Instance\.new\("([^"]+)"\)/);
+                    // TABLE OPERATIONS
+                    if (line.includes('table.insert')) {
+                        consoleLogs.push('[Table operation executed]');
+                    }
+
+                    // TABLE LOOPS (ipairs)
+                    if (line.includes('ipairs(')) {
+                        let match = line.match(/for\s+\w+,\s*(\w+)\s+in\s+ipairs\((\w+)\)\s+do/);
+                        if (match) {
+                            let itemVar = match[1];
+                            let tableVar = match[2];
+
+                            let bodyLines = [];
+                            while (i < lines.length && !lines[i].trim().startsWith('end')) {
+                                bodyLines.push(lines[i]);
+                                i++;
+                            }
+                            i++;
+
+                            if (code.includes(`local ${tableVar} = {`)) {
+                                let tableMatch = code.match(new RegExp(`local ${tableVar} = {([^}]+)}`));
+                                if (tableMatch) {
+                                    let items = tableMatch[1].split(',').map(s => s.trim().replace(/["']/g, ''));
+                                    items.forEach(item => {
+                                        variables[itemVar] = item;
+                                        bodyLines.forEach(bodyLine => {
+                                            bodyLine = bodyLine.trim();
+                                            if (bodyLine.startsWith('print(')) {
+                                                let content = bodyLine.match(/print\((.+)\)/);
+                                                if (content) {
+                                                    let text = content[1].replace(/["']/g, '').trim();
+                                                    if (variables[text] !== undefined) {
+                                                        text = variables[text];
+                                                    }
+                                                    consoleLogs.push(text);
+                                                }
+                                            }
+                                        });
+                                    });
+                                }
+                            }
+                        }
+                        continue;
+                    }
+
+                    // FUNCTION DEFINITION
+                    if (line.startsWith('local function ')) {
+                        let funcMatch = line.match(/local function\s+(\w+)\s*\(([^)]*)\)/);
+                        if (funcMatch) {
+                            let funcName = funcMatch[1];
+                            let params = funcMatch[2].split(',').map(p => p.trim());
+
+                            let funcBody = [];
+                            while (i < lines.length && !lines[i].trim().startsWith('end')) {
+                                funcBody.push(lines[i]);
+                                i++;
+                            }
+                            i++;
+
+                            instances[funcName] = { params, body: funcBody };
+                        }
+                        continue;
+                    }
+
+                    // FUNCTION CALL
+                    if (line.match(/^\w+\s*\(/)) {
+                        let callMatch = line.match(/(\w+)\s*\(([^)]*)\)/);
+                        if (callMatch && instances[callMatch[1]]) {
+                            let funcName = callMatch[1];
+                            let args = callMatch[2].split(',').map(a => a.trim().replace(/["']/g, ''));
+                            let func = instances[funcName];
+
+                            func.body.forEach(bodyLine => {
+                                bodyLine = bodyLine.trim();
+
+                                func.params.forEach((param, idx) => {
+                                    variables[param] = args[idx];
+                                });
+
+                                if (bodyLine.startsWith('print(')) {
+                                    let content = bodyLine.match(/print\((.+)\)/);
+                                    if (content) {
+                                        let text = content[1].replace(/["']/g, '').trim();
+                                        // Handle string concatenation
+                                        if (text.includes(' .. ')) {
+                                            text = text.split(' .. ').map(t => {
+                                                t = t.trim();
+                                                return variables[t] !== undefined ? variables[t] : t;
+                                            }).join('');
+                                        } else if (variables[text] !== undefined) {
+                                            text = variables[text];
+                                        }
+                                        consoleLogs.push(text);
+                                    }
+                                }
+                            });
+                        }
+                        continue;
+                    }
+
+                    // INSTANCE.NEW (GUI CREATION)
+                    const instanceMatch = line.match(/local\s+(\w+)\s*=\s*Instance\.new\("([^"]+)"\)/);
                     if (instanceMatch) {
                         let varName = instanceMatch[1];
                         let type = instanceMatch[2];
                         
                         let el = document.createElement('div');
+                        el.classList.add(`gui-${type.toLowerCase().replace('text', 'text-').toLowerCase()}`);
                         el.style.position = 'absolute';
-                        el.style.left = '50px'; // Standard-Position
-                        el.style.top = '50px';
                         
+                        instances[varName] = {
+                            type: type,
+                            element: el,
+                            props: {
+                                BackgroundColor3: 'rgb(255, 255, 255)',
+                                Size: { x: 100, y: 100 },
+                                Position: { x: 50, y: 50 },
+                                Text: 'Label'
+                            }
+                        };
+
                         if (type === 'Frame') {
+                            el.classList.add('gui-frame');
                             el.style.backgroundColor = 'white';
                             el.style.width = '100px';
                             el.style.height = '100px';
-                        } 
-                        else if (type === 'TextLabel' || type === 'TextButton') {
-                            el.style.backgroundColor = type === 'TextButton' ? '#e2e2e2' : 'transparent';
-                            el.style.color = 'white';
+                            el.style.left = '50px';
+                            el.style.top = '50px';
+                        } else if (type === 'TextLabel') {
+                            el.classList.add('gui-text-label');
+                            el.style.backgroundColor = 'transparent';
+                            el.style.color = 'black';
                             el.style.width = '150px';
                             el.style.height = '50px';
-                            el.style.display = 'flex';
-                            el.style.alignItems = 'center';
-                            el.style.justifyContent = 'center';
-                            el.style.fontFamily = 'sans-serif';
-                            el.style.fontWeight = 'bold';
+                            el.style.left = '50px';
+                            el.style.top = '50px';
                             el.innerText = 'Label';
-                            el.style.border = type === 'TextButton' ? '2px solid #555' : 'none';
+                            el.style.fontSize = '14px';
+                        } else if (type === 'TextButton') {
+                            el.classList.add('gui-button');
+                            el.style.backgroundColor = '#e2e2e2';
+                            el.style.color = 'black';
+                            el.style.width = '120px';
+                            el.style.height = '40px';
+                            el.style.left = '50px';
+                            el.style.top = '50px';
+                            el.innerText = 'Button';
+                            el.style.fontSize = '14px';
                         }
-                        
-                        viewport.appendChild(el);
-                        instances[varName] = el;
-                        consoleLogs.push(`[System] ${type} erstellt.`);
+
+                        continue;
                     }
 
-                    // Eigenschaften anpassen (z.B. frame.BackgroundColor3 = Color3.fromRGB(255,0,0))
+                    // SET PROPERTIES
                     Object.keys(instances).forEach(varName => {
-                        let el = instances[varName];
+                        if (!instances[varName].element) return;
+                        let inst = instances[varName];
+                        let el = inst.element;
 
-                        // .BackgroundColor3
-                        let colorMatch = line.match(new RegExp(`${varName}\\.BackgroundColor3\\s*=\\s*Color3\\.fromRGB\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)`));
-                        if (colorMatch) {
-                            el.style.backgroundColor = `rgb(${colorMatch[1]}, ${colorMatch[2]}, ${colorMatch[3]})`;
+                        // BackgroundColor3
+                        if (line.includes(`${varName}.BackgroundColor3 = Color3.fromRGB`)) {
+                            let colorMatch = line.match(/Color3\.fromRGB\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
+                            if (colorMatch) {
+                                el.style.backgroundColor = `rgb(${colorMatch[1]}, ${colorMatch[2]}, ${colorMatch[3]})`;
+                            }
                         }
 
-                        // .Text
-                        let textMatch = line.match(new RegExp(`${varName}\\.Text\\s*=\\s*"([^"]+)"`));
-                        if (textMatch) {
-                            el.innerText = textMatch[1];
+                        // Text
+                        if (line.includes(`${varName}.Text = `)) {
+                            let textMatch = line.match(/\.Text\s*=\s*"([^"]+)"/);
+                            if (textMatch) {
+                                el.innerText = textMatch[1];
+                            }
                         }
 
-                        // .Size (UDim2.new(0, x, 0, y))
-                        let sizeMatch = line.match(new RegExp(`${varName}\\.Size\\s*=\\s*UDim2\\.new\\(\\s*\\d+\\s*,\\s*(\\d+)\\s*,\\s*\\d+\\s*,\\s*(\\d+)\\s*\\)`));
-                        if (sizeMatch) {
-                            el.style.width = sizeMatch[1] + 'px';
-                            el.style.height = sizeMatch[2] + 'px';
+                        // Size
+                        if (line.includes(`${varName}.Size = UDim2.new`)) {
+                            let sizeMatch = line.match(/UDim2\.new\s*\(\s*0\s*,\s*(\d+)\s*,\s*0\s*,\s*(\d+)\s*\)/);
+                            if (sizeMatch) {
+                                el.style.width = sizeMatch[1] + 'px';
+                                el.style.height = sizeMatch[2] + 'px';
+                            }
+                        }
+
+                        // Position
+                        if (line.includes(`${varName}.Position = UDim2.new`)) {
+                            let posMatch = line.match(/UDim2\.new\s*\(\s*0\s*,\s*(\d+)\s*,\s*0\s*,\s*(\d+)\s*\)/);
+                            if (posMatch) {
+                                el.style.left = posMatch[1] + 'px';
+                                el.style.top = posMatch[2] + 'px';
+                            }
+                        }
+
+                        // Parent (add to viewport)
+                        if (line.includes(`${varName}.Parent = game.StarterGui`)) {
+                            if (!viewport.querySelector(`#${varName}`)) {
+                                el.id = varName;
+                                viewport.appendChild(el);
+                            }
                         }
                     });
-                });
+                }
 
-                // Konsole ausgeben
+                // Display output
                 if (consoleLogs.length > 0) {
                     outputBox.innerHTML = `<span class="success">${consoleLogs.join('<br>')}</span>`;
                 } else {
-                    outputBox.innerHTML = "<span class='system'>[System] Skript ohne Fehler ausgeführt, aber keine Ausgabe.</span>";
+                    outputBox.innerHTML = "<span class='system'>[System] Script executed without output.</span>";
                 }
 
-                // Level-Check
+                // CHECK LESSON
                 let currentLesson = lessons[currentLevel];
-                if (currentLesson && currentLesson.check(code, outputBox.innerText, viewport.innerHTML)) {
+                if (currentLesson && currentLesson.check(code, stripHtml(outputBox.innerHTML), viewport.innerHTML)) {
                     
-                    // Avatar freut sich (hüpft)
+                    // Avatar celebrate
                     avatar.style.animation = 'none';
                     setTimeout(() => {
                         avatar.style.animation = 'jump 0.5s ease-in-out 2';
                     }, 10);
 
-                    // Nächstes Level
+                    // Next lesson
                     setTimeout(() => {
                         currentLevel++;
                         if (lessons[currentLevel]) {
-                            bubble.innerHTML = "<span style='color:#a6e3a1; font-weight:bold;'>Richtig! 🌟</span><br>" + lessons[currentLevel].text;
+                            bubble.innerHTML = "<span style='color:#a6e3a1; font-weight:bold;'>✓ Correct! 🌟</span><br><br>" + lessons[currentLevel].text;
+                            updateLesson();
+                            document.getElementById('codeEditor').value = "";
                         }
                         avatar.style.animation = 'float 3s ease-in-out infinite';
                     }, 1200);
+                } else if (currentLesson) {
+                    // Wrong - try again message
+                    let feedback = "<span style='color:#f9e2af;'>Not quite right. Try again!</span>";
+                    if (currentLesson.hint) {
+                        feedback += `<br><span style='color:#89dceb;'>Hint: ${currentLesson.hint}</span>`;
+                    }
+                    bubble.innerHTML = feedback;
                 }
 
             } catch (e) {
-                outputBox.innerHTML = `<span class="error">Syntax-Fehler! Überprüfe deinen Code.<br>Tipp: Achte auf Klammern () und Anführungszeichen "".</span>`;
+                outputBox.innerHTML = `<span class="error">Syntax Error!\n${e.message}\n\nMake sure you have matching parentheses () and quotes "".</span>`;
             }
         }
+
+        function evaluateCondition(condition, variables) {
+            condition = condition.trim();
+            
+            if (condition.includes('>=')) {
+                let [left, right] = condition.split('>=');
+                let leftVal = isNaN(left.trim()) ? variables[left.trim()] : parseInt(left.trim());
+                let rightVal = isNaN(right.trim()) ? variables[right.trim()] : parseInt(right.trim());
+                return leftVal >= rightVal;
+            }
+            if (condition.includes('<=')) {
+                let [left, right] = condition.split('<=');
+                let leftVal = isNaN(left.trim()) ? variables[left.trim()] : parseInt(left.trim());
+                let rightVal = isNaN(right.trim()) ? variables[right.trim()] : parseInt(right.trim());
+                return leftVal <= rightVal;
+            }
+            if (condition.includes('<')) {
+                let [left, right] = condition.split('<');
+                let leftVal = isNaN(left.trim()) ? variables[left.trim()] : parseInt(left.trim());
+                let rightVal = isNaN(right.trim()) ? variables[right.trim()] : parseInt(right.trim());
+                return leftVal < rightVal;
+            }
+            if (condition.includes('>')) {
+                let [left, right] = condition.split('>');
+                let leftVal = isNaN(left.trim()) ? variables[left.trim()] : parseInt(left.trim());
+                let rightVal = isNaN(right.trim()) ? variables[right.trim()] : parseInt(right.trim());
+                return leftVal > rightVal;
+            }
+            if (condition.includes('==')) {
+                let [left, right] = condition.split('==');
+                let leftVal = isNaN(left.trim()) ? variables[left.trim()] : parseInt(left.trim());
+                let rightVal = isNaN(right.trim()) ? variables[right.trim()] : parseInt(right.trim());
+                return leftVal == rightVal;
+            }
+            
+            let val = variables[condition];
+            return val === true;
+        }
+
+        function evaluateExpression(expr, variables) {
+            expr = expr.trim();
+            
+            if (expr.includes('+')) {
+                let [left, right] = expr.split('+');
+                let leftVal = isNaN(left.trim()) ? variables[left.trim()] : parseInt(left.trim());
+                let rightVal = isNaN(right.trim()) ? variables[right.trim()] : parseInt(right.trim());
+                return leftVal + rightVal;
+            }
+            if (expr.includes('-')) {
+                let [left, right] = expr.split('-');
+                let leftVal = isNaN(left.trim()) ? variables[left.trim()] : parseInt(left.trim());
+                let rightVal = isNaN(right.trim()) ? variables[right.trim()] : parseInt(right.trim());
+                return leftVal - rightVal;
+            }
+            
+            return isNaN(expr) ? variables[expr] : parseInt(expr);
+        }
+
+        // Allow Enter to run code
+        document.getElementById('codeEditor').addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                runCode();
+            }
+        });
     </script>
 </body>
 </html>
