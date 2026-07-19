@@ -3,15 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lua Lernen mit KI-Lehrer</title>
+    <title>Luau lernen (Roblox Edition)</title>
     <style>
         :root {
             --bg-color: #1e1e2e;
             --panel-bg: #252538;
             --text-color: #cdd6f4;
-            --accent-color: #cba6f7;
+            --accent-color: #89b4fa; /* Roblox Studio Blau-Touch */
             --success-color: #a6e3a1;
             --error-color: #f38ba8;
+            --viewport-bg: #181825;
         }
 
         * {
@@ -30,7 +31,7 @@
             overflow: hidden;
         }
 
-        /* Header & Avatar Zone */
+        /* Header & Avatar */
         header {
             background-color: var(--panel-bg);
             padding: 20px;
@@ -38,17 +39,24 @@
             justify-content: space-between;
             align-items: center;
             border-bottom: 2px solid #313244;
-            height: 120px;
+            height: 140px;
         }
 
         .teacher-speech {
             background: #313244;
             padding: 15px;
             border-radius: 10px;
-            max-width: 70%;
+            max-width: 75%;
             position: relative;
-            font-size: 1.1rem;
-            line-height: 1.4;
+            font-size: 1.05rem;
+            line-height: 1.5;
+        }
+
+        .teacher-speech code {
+            background: #11111b;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--success-color);
         }
 
         .teacher-speech::after {
@@ -62,41 +70,44 @@
             border-color: transparent transparent transparent #313244;
         }
 
-        /* Avatar Animation */
         .avatar-container {
             display: flex;
             flex-direction: column;
             align-items: center;
-            width: 100px;
+            width: 120px;
         }
 
         .avatar {
-            width: 60px;
-            height: 60px;
+            width: 65px;
+            height: 65px;
             background-color: var(--accent-color);
-            border-radius: 50%;
+            border-radius: 20%; /* Etwas eckiger, wie ein Roblox-Kopf */
             position: relative;
             animation: float 3s ease-in-out infinite;
-            box-shadow: 0 0 15px rgba(203, 166, 247, 0.5);
+            box-shadow: 0 0 15px rgba(137, 180, 250, 0.4);
         }
 
-        /* Augen des Avatars blinken */
         .avatar::before, .avatar::after {
             content: '';
             position: absolute;
-            top: 22px;
-            width: 8px;
-            height: 8px;
+            top: 25px;
+            width: 10px;
+            height: 10px;
             background-color: #11111b;
             border-radius: 50%;
             animation: blink 4s infinite;
         }
-        .avatar::before { left: 16px; }
-        .avatar::after { right: 16px; }
+        .avatar::before { left: 14px; }
+        .avatar::after { right: 14px; }
 
         @keyframes float {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-8px); }
+        }
+
+        @keyframes jump {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
         }
 
         @keyframes blink {
@@ -105,32 +116,36 @@
         }
 
         .avatar-name {
-            font-size: 0.8rem;
+            font-size: 0.9rem;
             margin-top: 8px;
             color: var(--accent-color);
             font-weight: bold;
         }
 
-        /* Main Workspace */
+        /* Arbeitsbereich */
         .main-container {
             display: flex;
             flex: 1;
             padding: 20px;
             gap: 20px;
-            height: calc(100vh - 120px);
+            height: calc(100vh - 140px);
         }
 
-        .left-panel, .right-panel {
+        .left-panel {
             flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 10px;
         }
 
-        h2 {
-            color: var(--accent-color);
-            font-size: 1.2rem;
+        .right-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
+
+        h2 { color: var(--accent-color); font-size: 1.1rem; }
 
         /* Code Editor */
         textarea {
@@ -138,180 +153,294 @@
             flex: 1;
             background-color: #11111b;
             color: #a6e3a1;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 1rem;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 1.1rem;
             padding: 15px;
             border: 2px solid #313244;
             border-radius: 8px;
             resize: none;
             outline: none;
+            line-height: 1.4;
         }
 
-        textarea:focus {
-            border-color: var(--accent-color);
-        }
+        textarea:focus { border-color: var(--accent-color); }
 
         button {
             background-color: var(--accent-color);
             color: #11111b;
             border: none;
-            padding: 12px;
+            padding: 15px;
             border-radius: 8px;
             font-weight: bold;
-            font-size: 1rem;
+            font-size: 1.1rem;
             cursor: pointer;
-            transition: opacity 0.2s;
+            transition: 0.2s;
         }
 
-        button:hover {
-            opacity: 0.9;
+        button:hover { filter: brightness(1.2); }
+
+        /* Roblox Viewport (GUI Simulator) */
+        .viewport-container {
+            flex: 2; /* Nimmt mehr Platz ein */
+            background-image: 
+                linear-gradient(#252538 1px, transparent 1px),
+                linear-gradient(90deg, #252538 1px, transparent 1px);
+            background-size: 20px 20px;
+            background-color: var(--viewport-bg);
+            border: 2px solid #313244;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .viewport-title {
+            position: absolute;
+            top: 5px;
+            left: 10px;
+            color: #6c7086;
+            font-size: 0.8rem;
+            font-family: sans-serif;
+            z-index: 10;
         }
 
-        /* Output Screen */
+        /* Konsole */
         .output-box {
             flex: 1;
             background-color: #11111b;
             border: 2px solid #313244;
             border-radius: 8px;
             padding: 15px;
-            font-family: 'Courier New', Courier, monospace;
+            font-family: 'Consolas', 'Courier New', monospace;
             white-space: pre-wrap;
             overflow-y: auto;
         }
 
         .success { color: var(--success-color); }
         .error { color: var(--error-color); }
+        .system { color: #89dceb; }
     </style>
 </head>
 <body>
 
     <header>
         <div class="teacher-speech" id="bubble">
-            Hallo! Ich bin dein Lua-Lehrer. Lass uns starten! Schreibe folgendes in das Textfeld, um Text auszugeben: <br>
-            <code>print("Hallo Welt")</code>
+            Lade Luau-Lektionen...
         </div>
         <div class="avatar-container">
             <div class="avatar" id="avatar"></div>
-            <div class="avatar-name">LUA-BOT</div>
+            <div class="avatar-name">Dev-Bot</div>
         </div>
     </header>
 
     <div class="main-container">
-        <!-- Linke Seite: Editor -->
+        <!-- Editor -->
         <div class="left-panel">
-            <h2>Dein Lua-Code:</h2>
-            <textarea id="codeEditor" placeholder="Schreibe deinen Code hier hin..." spellcheck="false">-- Dein Code</textarea>
-            <button onclick="runCode()">Code ausführen</button>
+            <h2>Luau Skript:</h2>
+            <textarea id="codeEditor" spellcheck="false">print("Hallo Roblox!")</textarea>
+            <button onclick="runCode()">▶ Skript ausführen</button>
         </div>
 
-        <!-- Rechte Seite: Output -->
+        <!-- Visueller Output & Konsole -->
         <div class="right-panel">
-            <h2>Konsole / Output:</h2>
-            <div class="output-box" id="output">Noch kein Code ausgeführt.</div>
+            <h2>Roblox Screen / GUI:</h2>
+            <div class="viewport-container" id="viewport">
+                <span class="viewport-title">StarterGui Viewport</span>
+                <!-- Hier spawnen die simulierten Roblox GUIs -->
+            </div>
+            
+            <h2>Output (Konsole):</h2>
+            <div class="output-box" id="output">Warte auf Skript...</div>
         </div>
     </div>
 
     <script>
-        // Lernstufen-Datenbank
+        // Die Lektionen-Datenbank
         const lessons = [
             {
-                instruction: "Super! Level 1 geschafft. Lass uns Variablen lernen. In Lua erstellt man eine Variable mit 'local'. Erstelle eine Variable namens 'name' mit deinem Namen und printe sie aus. <br>Beispiel:<br><code>local name = \"Daniel\"<br>print(name)</code>",
-                check: (code, out) => code.includes("local") && code.includes("print") && out.trim().length > 0
+                text: "Willkommen im Studio! Lass uns testen, ob die Konsole geht. Nutze <code>print(\"Dein Text\")</code> um etwas auszugeben.",
+                check: (code, out, html) => code.includes("print") && out.trim().length > 0
             },
             {
-                instruction: "Klasse! Jetzt machen wir Berechnungen. Erstelle eine Variable 'x', gib ihr den Wert 5, und printe <code>x + 10</code> aus.",
-                check: (code, out) => code.includes("print") && out.includes("15")
+                text: "Sehr gut! Variablen speichern Daten. Erstelle eine Variable: <code>local spieler = \"Daniel\"</code> und printe sie aus.",
+                check: (code, out, html) => code.includes("local") && code.includes("spieler") && out.includes("Daniel")
             },
             {
-                instruction: "Genial! Du hast die Grundlagen verstanden. Jetzt kannst du frei experimentieren oder eigene Skripte schreiben!",
-                check: () => false // Letztes Level, läuft endlos
+                text: "Perfekt. Jetzt probieren wir einen Loop (Schleife). Zähle von 1 bis 5: <br><code>for i = 1, 5 do<br>&nbsp;&nbsp;print(i)<br>end</code>",
+                check: (code, out, html) => code.includes("for") && out.includes("1") && out.includes("5")
+            },
+            {
+                text: "Stark! Jetzt if-Bedingungen. Erstelle <code>local admin = true</code>. Schreibe danach: <br><code>if admin then print(\"Willkommen\") end</code>",
+                check: (code, out, html) => code.includes("if") && code.includes("then") && out.includes("Willkommen")
+            },
+            {
+                text: "Jetzt wird's visuell! Wir machen ein GUI. Erstelle einen Frame im Viewport rechts:<br><code>local frame = Instance.new(\"Frame\")</code>",
+                check: (code, out, html) => html.includes("background-color: white") || code.includes("Instance.new(\"Frame\")")
+            },
+            {
+                text: "Klasse, der Frame ist da! Lass uns die Farbe ändern. Füge das deinem Skript hinzu:<br><code>frame.BackgroundColor3 = Color3.fromRGB(255, 0, 0)</code>",
+                check: (code, out, html) => code.includes("BackgroundColor3") && code.includes("Color3")
+            },
+            {
+                text: "Super! Jetzt noch ein Text-Label. Ersetze Frame durch TextLabel und gib ihm einen Text:<br><code>local text = Instance.new(\"TextLabel\")<br>text.Text = \"Mein Simulator\"</code>",
+                check: (code, out, html) => code.includes("Instance.new(\"TextLabel\")") && code.includes("Text =")
+            },
+            {
+                text: "Du bist ein Meister-Scripter! Du hast die Basics drauf. Ab hier kannst du frei programmieren, GUIs bauen und testen!",
+                check: () => false // Sandbox Modus
             }
         ];
 
         let currentLevel = 0;
+        const bubble = document.getElementById('bubble');
+        const avatar = document.getElementById('avatar');
+        const outputBox = document.getElementById('output');
+        const viewport = document.getElementById('viewport');
+        
+        // Start Lektion setzen
+        bubble.innerHTML = lessons[currentLevel].text;
 
         function runCode() {
             const code = document.getElementById('codeEditor').value;
-            const outputBox = document.getElementById('output');
-            const bubble = document.getElementById('bubble');
-            const avatar = document.getElementById('avatar');
+            
+            // Konsole & Viewport zurücksetzen
+            outputBox.innerHTML = "";
+            let consoleLogs = [];
+            
+            // Viewport resetten, aber den Titel behalten
+            viewport.innerHTML = '<span class="viewport-title">StarterGui Viewport</span>';
+            
+            let instances = {}; // Speichert unsere simulierten GUI-Elemente
 
-            // Da echtes Lua nicht nativ im Browser läuft, simulieren wir die wichtigsten Funktionen (print & local) für den Lerneffekt via JS
             try {
-                outputBox.innerHTML = "";
-                let consoleLogs = [];
+                const lines = code.split('\n');
 
-                // Ganz einfacher Parser für Print-Befehle zu Demozwecken
-                if (code.includes("print")) {
-                    // Sucht nach Inhalten in print(...)
-                    const lines = code.split('\n');
-                    let variables = {};
+                // Einfacher Parser für Luau-Syntax
+                lines.forEach(line => {
+                    line = line.trim();
+                    if(line === "") return;
 
-                    lines.forEach(line => {
-                        line = line.trim();
-                        // Variablen-Simulation (local x = y)
-                        if (line.startsWith("local")) {
-                            const parts = line.replace("local", "").split("=");
-                            if (parts.length === 2) {
-                                let varName = parts[0].trim();
-                                let varVal = parts[1].trim().replace(/"/g, "").replace(/'/g, "");
-                                // Falls es eine Zahl ist
-                                if (!isNaN(varVal)) varVal = Number(varVal);
-                                variables[varName] = varVal;
-                            }
+                    // 1. FOR-Schleife simulieren
+                    const forMatch = line.match(/for\s+(\w+)\s*=\s*(\d+)\s*,\s*(\d+)\s*do/);
+                    if (forMatch && code.includes("print(" + forMatch[1] + ")")) {
+                        let start = parseInt(forMatch[2]);
+                        let end = parseInt(forMatch[3]);
+                        for(let i=start; i<=end; i++) {
+                            consoleLogs.push(i);
+                        }
+                    }
+
+                    // 2. IF-Bedingung simulieren (sehr simpel)
+                    if (line.includes("if ") && line.includes("then") && line.includes("print(")) {
+                        let printContent = line.match(/print\("([^"]+)"\)/);
+                        if (printContent) consoleLogs.push(printContent[1]);
+                    }
+
+                    // 3. Normales Print
+                    if (line.startsWith("print(") && !line.includes("if ") && !line.includes("for ")) {
+                        let content = line.match(/\(([^)]+)\)/);
+                        if (content) {
+                            let text = content[1].replace(/["']/g, "");
+                            // Check ob es eine Variable ist (rudimentär)
+                            let isVar = code.match(new RegExp(`local\\s+${text}\\s*=\\s*"([^"]+)"`));
+                            if (isVar) text = isVar[1];
+                            
+                            consoleLogs.push(text);
+                        }
+                    }
+
+                    // ==========================================
+                    // ROBLOX GUI SIMULATOR ENGINE
+                    // ==========================================
+
+                    // Instance.new() erkennen
+                    let instanceMatch = line.match(/local\s+(\w+)\s*=\s*Instance\.new\("([^"]+)"\)/);
+                    if (instanceMatch) {
+                        let varName = instanceMatch[1];
+                        let type = instanceMatch[2];
+                        
+                        let el = document.createElement('div');
+                        el.style.position = 'absolute';
+                        el.style.left = '50px'; // Standard-Position
+                        el.style.top = '50px';
+                        
+                        if (type === 'Frame') {
+                            el.style.backgroundColor = 'white';
+                            el.style.width = '100px';
+                            el.style.height = '100px';
+                        } 
+                        else if (type === 'TextLabel' || type === 'TextButton') {
+                            el.style.backgroundColor = type === 'TextButton' ? '#e2e2e2' : 'transparent';
+                            el.style.color = 'white';
+                            el.style.width = '150px';
+                            el.style.height = '50px';
+                            el.style.display = 'flex';
+                            el.style.alignItems = 'center';
+                            el.style.justifyContent = 'center';
+                            el.style.fontFamily = 'sans-serif';
+                            el.style.fontWeight = 'bold';
+                            el.innerText = 'Label';
+                            el.style.border = type === 'TextButton' ? '2px solid #555' : 'none';
                         }
                         
-                        // Print-Simulation
-                        if (line.startsWith("print")) {
-                            let content = line.match(/\(([^)]+)\)/)[1];
-                            content = content.replace(/"/g, "").replace(/'/g, "");
-                            
-                            // Prüfen ob es eine mathematische Operation mit einer Variable ist
-                            if (content.includes("+")) {
-                                let expression = content.split("+");
-                                let left = expression[0].trim();
-                                let right = expression[1].trim();
-                                
-                                if(variables[left] !== undefined) left = variables[left];
-                                if(variables[right] !== undefined) right = variables[right];
-                                
-                                consoleLogs.push(Number(left) + Number(right));
-                            } else if (variables[content] !== undefined) {
-                                consoleLogs.push(variables[content]);
-                            } else {
-                                consoleLogs.push(content);
-                            }
+                        viewport.appendChild(el);
+                        instances[varName] = el;
+                        consoleLogs.push(`[System] ${type} erstellt.`);
+                    }
+
+                    // Eigenschaften anpassen (z.B. frame.BackgroundColor3 = Color3.fromRGB(255,0,0))
+                    Object.keys(instances).forEach(varName => {
+                        let el = instances[varName];
+
+                        // .BackgroundColor3
+                        let colorMatch = line.match(new RegExp(`${varName}\\.BackgroundColor3\\s*=\\s*Color3\\.fromRGB\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)`));
+                        if (colorMatch) {
+                            el.style.backgroundColor = `rgb(${colorMatch[1]}, ${colorMatch[2]}, ${colorMatch[3]})`;
+                        }
+
+                        // .Text
+                        let textMatch = line.match(new RegExp(`${varName}\\.Text\\s*=\\s*"([^"]+)"`));
+                        if (textMatch) {
+                            el.innerText = textMatch[1];
+                        }
+
+                        // .Size (UDim2.new(0, x, 0, y))
+                        let sizeMatch = line.match(new RegExp(`${varName}\\.Size\\s*=\\s*UDim2\\.new\\(\\s*\\d+\\s*,\\s*(\\d+)\\s*,\\s*\\d+\\s*,\\s*(\\d+)\\s*\\)`));
+                        if (sizeMatch) {
+                            el.style.width = sizeMatch[1] + 'px';
+                            el.style.height = sizeMatch[2] + 'px';
                         }
                     });
+                });
 
-                    if (consoleLogs.length > 0) {
-                        outputBox.innerHTML = `<span class="success">${consoleLogs.join('\n')}</span>`;
-                    } else {
-                        outputBox.innerHTML = "<span class='error'>Fehler: Ungültige print-Syntax. Vergiss die Klammern () nicht.</span>";
-                    }
+                // Konsole ausgeben
+                if (consoleLogs.length > 0) {
+                    outputBox.innerHTML = `<span class="success">${consoleLogs.join('<br>')}</span>`;
                 } else {
-                    outputBox.innerHTML = "<span class='error'>Fehler: Nutze den 'print'-Befehl, um etwas auszugeben.</span>";
+                    outputBox.innerHTML = "<span class='system'>[System] Skript ohne Fehler ausgeführt, aber keine Ausgabe.</span>";
                 }
 
-                // Prüfen ob die Aufgabe vom Lehrer erfüllt wurde
+                // Level-Check
                 let currentLesson = lessons[currentLevel];
-                if (currentLesson && currentLesson.check(code, outputBox.innerText)) {
-                    // Hüpf-Animation für den Avatar bei Erfolg triggeren
+                if (currentLesson && currentLesson.check(code, outputBox.innerText, viewport.innerHTML)) {
+                    
+                    // Avatar freut sich (hüpft)
                     avatar.style.animation = 'none';
                     setTimeout(() => {
-                        avatar.style.animation = 'float 0.5s ease-in-out 3';
+                        avatar.style.animation = 'jump 0.5s ease-in-out 2';
                     }, 10);
 
-                    // Nächstes Level laden
+                    // Nächstes Level
                     setTimeout(() => {
-                        bubble.innerHTML = lessons[currentLevel].instruction;
                         currentLevel++;
+                        if (lessons[currentLevel]) {
+                            bubble.innerHTML = "<span style='color:#a6e3a1; font-weight:bold;'>Richtig! 🌟</span><br>" + lessons[currentLevel].text;
+                        }
                         avatar.style.animation = 'float 3s ease-in-out infinite';
-                    }, 1500);
+                    }, 1200);
                 }
 
             } catch (e) {
-                outputBox.innerHTML = `<span class="error">Syntax-Fehler: Stelle sicher, dass dein Code richtig geschrieben ist.</span>`;
+                outputBox.innerHTML = `<span class="error">Syntax-Fehler! Überprüfe deinen Code.<br>Tipp: Achte auf Klammern () und Anführungszeichen "".</span>`;
             }
         }
     </script>
