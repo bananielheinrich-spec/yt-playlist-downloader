@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lua Lernen mit KI-Lehrer</title>
+    <style>
+        :root {
+            --bg-color: #1e1e2e;
+            --panel-bg: #252538;
+            --text-color: #cdd6f4;
+            --accent-color: #cba6f7;
+            --success-color: #a6e3a1;
+            --error-color: #f38ba8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Header & Avatar Zone */
+        header {
+            background-color: var(--panel-bg);
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #313244;
+            height: 120px;
+        }
+
+        .teacher-speech {
+            background: #313244;
+            padding: 15px;
+            border-radius: 10px;
+            max-width: 70%;
+            position: relative;
+            font-size: 1.1rem;
+            line-height: 1.4;
+        }
+
+        .teacher-speech::after {
+            content: '';
+            position: absolute;
+            right: -10px;
+            top: 50%;
+            transform: translateY(-50%);
+            border-width: 10px 0 10px 10px;
+            border-style: solid;
+            border-color: transparent transparent transparent #313244;
+        }
+
+        /* Avatar Animation */
+        .avatar-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100px;
+        }
+
+        .avatar {
+            width: 60px;
+            height: 60px;
+            background-color: var(--accent-color);
+            border-radius: 50%;
+            position: relative;
+            animation: float 3s ease-in-out infinite;
+            box-shadow: 0 0 15px rgba(203, 166, 247, 0.5);
+        }
+
+        /* Augen des Avatars blinken */
+        .avatar::before, .avatar::after {
+            content: '';
+            position: absolute;
+            top: 22px;
+            width: 8px;
+            height: 8px;
+            background-color: #11111b;
+            border-radius: 50%;
+            animation: blink 4s infinite;
+        }
+        .avatar::before { left: 16px; }
+        .avatar::after { right: 16px; }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        @keyframes blink {
+            0%, 90%, 100% { transform: scaleY(1); }
+            95% { transform: scaleY(0.1); }
+        }
+
+        .avatar-name {
+            font-size: 0.8rem;
+            margin-top: 8px;
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+
+        /* Main Workspace */
+        .main-container {
+            display: flex;
+            flex: 1;
+            padding: 20px;
+            gap: 20px;
+            height: calc(100vh - 120px);
+        }
+
+        .left-panel, .right-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        h2 {
+            color: var(--accent-color);
+            font-size: 1.2rem;
+        }
+
+        /* Code Editor */
+        textarea {
+            width: 100%;
+            flex: 1;
+            background-color: #11111b;
+            color: #a6e3a1;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1rem;
+            padding: 15px;
+            border: 2px solid #313244;
+            border-radius: 8px;
+            resize: none;
+            outline: none;
+        }
+
+        textarea:focus {
+            border-color: var(--accent-color);
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: #11111b;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        /* Output Screen */
+        .output-box {
+            flex: 1;
+            background-color: #11111b;
+            border: 2px solid #313244;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre-wrap;
+            overflow-y: auto;
+        }
+
+        .success { color: var(--success-color); }
+        .error { color: var(--error-color); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="teacher-speech" id="bubble">
+            Hallo! Ich bin dein Lua-Lehrer. Lass uns starten! Schreibe folgendes in das Textfeld, um Text auszugeben: <br>
+            <code>print("Hallo Welt")</code>
+        </div>
+        <div class="avatar-container">
+            <div class="avatar" id="avatar"></div>
+            <div class="avatar-name">LUA-BOT</div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Linke Seite: Editor -->
+        <div class="left-panel">
+            <h2>Dein Lua-Code:</h2>
+            <textarea id="codeEditor" placeholder="Schreibe deinen Code hier hin..." spellcheck="false">-- Dein Code</textarea>
+            <button onclick="runCode()">Code ausführen</button>
+        </div>
+
+        <!-- Rechte Seite: Output -->
+        <div class="right-panel">
+            <h2>Konsole / Output:</h2>
+            <div class="output-box" id="output">Noch kein Code ausgeführt.</div>
+        </div>
+    </div>
+
+    <script>
+        // Lernstufen-Datenbank
+        const lessons = [
+            {
+                instruction: "Super! Level 1 geschafft. Lass uns Variablen lernen. In Lua erstellt man eine Variable mit 'local'. Erstelle eine Variable namens 'name' mit deinem Namen und printe sie aus. <br>Beispiel:<br><code>local name = \"Daniel\"<br>print(name)</code>",
+                check: (code, out) => code.includes("local") && code.includes("print") && out.trim().length > 0
+            },
+            {
+                instruction: "Klasse! Jetzt machen wir Berechnungen. Erstelle eine Variable 'x', gib ihr den Wert 5, und printe <code>x + 10</code> aus.",
+                check: (code, out) => code.includes("print") && out.includes("15")
+            },
+            {
+                instruction: "Genial! Du hast die Grundlagen verstanden. Jetzt kannst du frei experimentieren oder eigene Skripte schreiben!",
+                check: () => false // Letztes Level, läuft endlos
+            }
+        ];
+
+        let currentLevel = 0;
+
+        function runCode() {
+            const code = document.getElementById('codeEditor').value;
+            const outputBox = document.getElementById('output');
+            const bubble = document.getElementById('bubble');
+            const avatar = document.getElementById('avatar');
+
+            // Da echtes Lua nicht nativ im Browser läuft, simulieren wir die wichtigsten Funktionen (print & local) für den Lerneffekt via JS
+            try {
+                outputBox.innerHTML = "";
+                let consoleLogs = [];
+
+                // Ganz einfacher Parser für Print-Befehle zu Demozwecken
+                if (code.includes("print")) {
+                    // Sucht nach Inhalten in print(...)
+                    const lines = code.split('\n');
+                    let variables = {};
+
+                    lines.forEach(line => {
+                        line = line.trim();
+                        // Variablen-Simulation (local x = y)
+                        if (line.startsWith("local")) {
+                            const parts = line.replace("local", "").split("=");
+                            if (parts.length === 2) {
+                                let varName = parts[0].trim();
+                                let varVal = parts[1].trim().replace(/"/g, "").replace(/'/g, "");
+                                // Falls es eine Zahl ist
+                                if (!isNaN(varVal)) varVal = Number(varVal);
+                                variables[varName] = varVal;
+                            }
+                        }
+                        
+                        // Print-Simulation
+                        if (line.startsWith("print")) {
+                            let content = line.match(/\(([^)]+)\)/)[1];
+                            content = content.replace(/"/g, "").replace(/'/g, "");
+                            
+                            // Prüfen ob es eine mathematische Operation mit einer Variable ist
+                            if (content.includes("+")) {
+                                let expression = content.split("+");
+                                let left = expression[0].trim();
+                                let right = expression[1].trim();
+                                
+                                if(variables[left] !== undefined) left = variables[left];
+                                if(variables[right] !== undefined) right = variables[right];
+                                
+                                consoleLogs.push(Number(left) + Number(right));
+                            } else if (variables[content] !== undefined) {
+                                consoleLogs.push(variables[content]);
+                            } else {
+                                consoleLogs.push(content);
+                            }
+                        }
+                    });
+
+                    if (consoleLogs.length > 0) {
+                        outputBox.innerHTML = `<span class="success">${consoleLogs.join('\n')}</span>`;
+                    } else {
+                        outputBox.innerHTML = "<span class='error'>Fehler: Ungültige print-Syntax. Vergiss die Klammern () nicht.</span>";
+                    }
+                } else {
+                    outputBox.innerHTML = "<span class='error'>Fehler: Nutze den 'print'-Befehl, um etwas auszugeben.</span>";
+                }
+
+                // Prüfen ob die Aufgabe vom Lehrer erfüllt wurde
+                let currentLesson = lessons[currentLevel];
+                if (currentLesson && currentLesson.check(code, outputBox.innerText)) {
+                    // Hüpf-Animation für den Avatar bei Erfolg triggeren
+                    avatar.style.animation = 'none';
+                    setTimeout(() => {
+                        avatar.style.animation = 'float 0.5s ease-in-out 3';
+                    }, 10);
+
+                    // Nächstes Level laden
+                    setTimeout(() => {
+                        bubble.innerHTML = lessons[currentLevel].instruction;
+                        currentLevel++;
+                        avatar.style.animation = 'float 3s ease-in-out infinite';
+                    }, 1500);
+                }
+
+            } catch (e) {
+                outputBox.innerHTML = `<span class="error">Syntax-Fehler: Stelle sicher, dass dein Code richtig geschrieben ist.</span>`;
+            }
+        }
+    </script>
+</body>
+</html>
