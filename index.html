@@ -274,8 +274,20 @@
         let masterConn = null;
         let roomClients = {};
         let activeCalls = {};
-        const MASTER_ID = 'hghub-global-master-v2';
+        const MASTER_ID = 'hghub-global-master-v3';
         let myInfo = { name: '', avatar: '' };
+
+        // Robuste Server-Liste für mobile Netze (z.B. iPhone LTE/5G)
+        const iceConfig = {
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stunprotocol.org:3478' },
+                    { urls: 'stun:stun.services.mozilla.com' }
+                ]
+            }
+        };
 
         const lobbyScreen = document.getElementById('lobby-screen');
         const chatScreen = document.getElementById('chat-screen');
@@ -406,9 +418,7 @@
         }
 
         function initNetworkSystem() {
-            const testPeer = new Peer(MASTER_ID, {
-                config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
-            });
+            const testPeer = new Peer(MASTER_ID, iceConfig);
 
             testPeer.on('open', (id) => {
                 peer = testPeer;
@@ -421,9 +431,7 @@
             testPeer.on('error', (err) => {
                 if (err.type === 'unavailable-id') {
                     testPeer.destroy();
-                    peer = new Peer({
-                        config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
-                    });
+                    peer = new Peer(iceConfig);
                     peer.on('open', (id) => {
                         isMaster = false;
                         addParticipantToUI(myInfo.name, myInfo.avatar, id, true);
@@ -471,9 +479,7 @@
         }
 
         function setupClientEvents() {
-            masterConn = peer.connect(MASTER_ID, {
-                config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
-            });
+            masterConn = peer.connect(MASTER_ID, iceConfig);
 
             masterConn.on('open', () => {
                 masterConn.send({ type: 'join', info: myInfo });
@@ -485,7 +491,6 @@
                 }
             });
 
-            // Wenn der Master den Raum verlässt, übernimmt automatisch ein anderer Client!
             masterConn.on('close', () => {
                 handleMasterDisconnection();
             });
@@ -497,20 +502,17 @@
         }
 
         function handleMasterDisconnection() {
-            // Alte Audio-Streams & UI aufräumen
             for (let id in activeCalls) {
                 activeCalls[id].close();
             }
             activeCalls = {};
             participantsList.innerHTML = '';
             
-            // Versuche selbst neuer Master zu werden!
             if (peer) peer.destroy();
             initNetworkSystem();
         }
 
         function syncCallsWithList(list) {
-            // Entferne Teilnehmer aus der UI, die nicht mehr in der Liste sind
             const currentIds = list.map(p => p.id);
             document.querySelectorAll('.participant-card').forEach(card => {
                 const pId = card.id.replace('card-', '');
@@ -530,9 +532,7 @@
 
                 if (!activeCalls[p.id]) {
                     if (peer.id < p.id) {
-                        const call = peer.call(p.id, localStream, {
-                            config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
-                        });
+                        const call = peer.call(p.id, localStream, iceConfig);
                         handleOutgoingCall(call, p.id);
                     }
                 }
