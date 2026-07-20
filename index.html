@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Roblox Voice Hub</title>
+    <title>Voice Hub</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -123,16 +123,15 @@
 </head>
 <body>
 
-    <!-- LOBBY SCREEN -->
+    <!-- LOBBY -->
     <div class="container" id="lobby-screen">
-        <h2>Roblox Voice Hub</h2>
+        <h2>Voice Hub Lobby</h2>
         
         <div class="avatar-upload">
             <label for="avatarInput">
-                <div class="avatar-preview" id="avatarPreview">RB</div>
+                <div class="avatar-preview" id="avatarPreview">VH</div>
             </label>
             <input type="file" id="avatarInput" accept="image/*">
-            <span style="font-size: 11px; color: #949ba4;">Profilbild auswählen</span>
         </div>
 
         <div class="input-group">
@@ -142,11 +141,11 @@
 
         <div class="input-group">
             <label>Raum-Name</label>
-            <input type="text" id="roomInput" placeholder="z. B. hangouthub">
+            <input type="text" id="roomInput" placeholder="z. B. main">
         </div>
 
         <button id="joinBtn">Beitreten</button>
-        <div id="error-msg">Fehler</div>
+        <div id="error-msg">Dieser Name ist bereits im Raum vergeben!</div>
     </div>
 
     <!-- CALL SCREEN -->
@@ -164,121 +163,138 @@
 
     <div id="audio-container" style="display:none;"></div>
 
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <script>
+        const socket = io();
+        let localStream;
+        let isMuted = false;
+        const peers = {}; // Speichert WebRTC Verbindungen
+
+        // UI Elemente
         const lobbyScreen = document.getElementById('lobby-screen');
         const callScreen = document.getElementById('call-screen');
-        const joinBtn = document.getElementById('joinBtn');
-        const leaveBtn = document.getElementById('leaveBtn');
-        const muteSelfBtn = document.getElementById('muteSelfBtn');
-        const usernameInput = document.getElementById('usernameInput');
-        const roomInput = document.getElementById('roomInput');
-        const avatarInput = document.getElementById('avatarInput');
-        const avatarPreview = document.getElementById('avatarPreview');
-        const userList = document.getElementById('userList');
-        const audioContainer = document.getElementById('audio-container');
         const errorMsg = document.getElementById('error-msg');
-        const roomTitleDisplay = document.getElementById('roomTitleDisplay');
-
-        let peer;
-        let localStream;
-        let myName = "";
-        let myRoom = "";
+        const userList = document.getElementById('userList');
         let myAvatarUrl = "";
-        let isMuted = false;
-        const activePeers = {};
+        let myName = "";
 
-        avatarInput.addEventListener('change', (e) => {
+        // Profilbild hochladen
+        document.getElementById('avatarInput').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(event) {
                     myAvatarUrl = event.target.result;
-                    avatarPreview.innerHTML = `<img src="${myAvatarUrl}">`;
+                    document.getElementById('avatarPreview').innerHTML = `<img src="${myAvatarUrl}">`;
                 }
                 reader.readAsDataURL(file);
             }
         });
 
-        joinBtn.addEventListener('click', async () => {
-            myName = usernameInput.value.trim();
-            myRoom = roomInput.value.trim().toLowerCase();
+        // Beitreten
+        document.getElementById('joinBtn').addEventListener('click', async () => {
+            myName = document.getElementById('usernameInput').value.trim();
+            const roomName = document.getElementById('roomInput').value.trim().toLowerCase();
 
-            if (!myName || !myRoom) {
-                errorMsg.innerText = "Bitte Namen und Raum eingeben!";
-                errorMsg.style.display = "block";
-                return;
-            }
-
-            errorMsg.style.display = "none";
+            if (!myName || !roomName) return;
 
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-
-                // Feste ID basierend auf Raum und Namen, damit es eindeutig ist
-                const cleanName = myName.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-                const myPeerId = `rbx-${myRoom}-${cleanName}`;
-
-                peer = new Peer(myPeerId);
-
-                peer.on('open', (id) => {
-                    lobbyScreen.style.display = 'none';
-                    callScreen.style.display = 'block';
-                    roomTitleDisplay.innerText = "Raum: " + myRoom;
-
-                    addUserToList(myName, myAvatarUrl, cleanName, true);
-
-                    // Suche nach anderen im selben Raum (wir probieren, bekannte IDs anzurufen oder zu finden)
-                    startSearchingPeers(myRoom, cleanName);
-                });
-
-                peer.on('error', (err) => {
-                    if (err.type === 'unavailable-id') {
-                        errorMsg.innerText = "Dieser Name ist in diesem Raum bereits vergeben!";
-                        errorMsg.style.display = "block";
-                        if (localStream) localStream.getTracks().forEach(t => t.stop());
-                    }
-                });
-
-                // Wenn ein anderer anruft
-                peer.on('call', (call) => {
-                    call.answer(localStream);
-                    call.on('stream', (remoteStream) => {
-                        handleRemoteStream(remoteStream, call.peer);
-                    });
-                });
-
+                socket.emit('join-room', roomName, myName, myAvatarUrl);
+                document.getElementById('roomTitleDisplay').innerText = "Raum: " + roomName;
             } catch (err) {
-                console.error(err);
-                errorMsg.innerText = "Mikrofon-Zugriff verweigert!";
-                errorMsg.style.display = "block";
+                alert("Mikrofon-Zugriff verweigert!");
             }
         });
 
-        function startSearchingPeers(room, myCleanName) {
-            // Da wir keinen zentralen Server haben, verbindet sich dieser Timer mit potenziellen Mitspielern,
-            // indem er gängige Test-IDs im selben Raum anunkt.
-            setInterval(() => {
-                // Beispiel: Wenn dein Freund beitritt, ruft ihr euch gegenseitig über die Peer-ID an
-            }, 5000);
+        // Server-Antworten
+        socket.on('name-taken', () => {
+            errorMsg.style.display = "block";
+            localStream.getTracks().forEach(t => t.stop());
+        });
+
+        socket.on('room-users', (users) => {
+            lobbyScreen.style.display = 'none';
+            callScreen.style.display = 'block';
+            errorMsg.style.display = "none";
+            
+            // Mich selbst hinzufügen
+            addUserToUI(socket.id, myName, myAvatarUrl, true);
+
+            // Andere hinzufügen und anrufen
+            for (const id in users) {
+                if (id !== socket.id) {
+                    addUserToUI(id, users[id].username, users[id].avatar, false);
+                    createPeerConnection(id, true);
+                }
+            }
+        });
+
+        socket.on('user-connected', (id, username, avatar) => {
+            addUserToUI(id, username, avatar, false);
+            createPeerConnection(id, false);
+        });
+
+        socket.on('user-disconnected', (id) => {
+            if (peers[id]) peers[id].close();
+            delete peers[id];
+            const userEl = document.getElementById('user-' + id);
+            if (userEl) userEl.remove();
+            const audioEl = document.getElementById('audio-' + id);
+            if (audioEl) audioEl.remove();
+        });
+
+        // WebRTC Logik
+        function createPeerConnection(id, isCaller) {
+            const peer = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            });
+            peers[id] = peer;
+
+            localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
+
+            peer.ontrack = (event) => {
+                let audio = document.getElementById('audio-' + id);
+                if (!audio) {
+                    audio = document.createElement('audio');
+                    audio.id = 'audio-' + id;
+                    audio.autoplay = true;
+                    document.getElementById('audio-container').appendChild(audio);
+                }
+                audio.srcObject = event.streams[0];
+            };
+
+            peer.onicecandidate = (event) => {
+                if (event.candidate) socket.emit('candidate', id, event.candidate);
+            };
+
+            if (isCaller) {
+                peer.createOffer().then(offer => {
+                    peer.setLocalDescription(offer);
+                    socket.emit('offer', id, offer);
+                });
+            }
         }
 
-        // Man kann auch direkt eine ID eingeben oder automatisch verbinden lassen
-        function handleRemoteStream(stream, peerId) {
-            if (document.getElementById('audio-' + peerId)) return;
+        socket.on('offer', (id, description) => {
+            peers[id].setRemoteDescription(description)
+                .then(() => peers[id].createAnswer())
+                .then(answer => {
+                    peers[id].setLocalDescription(answer);
+                    socket.emit('answer', id, answer);
+                });
+        });
 
-            const audio = document.createElement('audio');
-            audio.srcObject = stream;
-            audio.autoplay = true;
-            audio.id = 'audio-' + peerId;
-            audioContainer.appendChild(audio);
+        socket.on('answer', (id, description) => {
+            peers[id].setRemoteDescription(description);
+        });
 
-            const parts = peerId.split('-');
-            const remoteName = parts.slice(2).join('-') || "Mitspieler";
-            addUserToList(remoteName, "", parts[parts.length - 1], false);
-        }
+        socket.on('candidate', (id, candidate) => {
+            peers[id].addIceCandidate(new RTCIceCandidate(candidate));
+        });
 
-        function addUserToList(name, avatarUrl, id, isMe = false) {
+        // UI Hilfsfunktionen
+        function addUserToUI(id, name, avatarUrl, isMe) {
             if (document.getElementById('user-' + id)) return;
             
             const div = document.createElement('div');
@@ -286,11 +302,7 @@
             div.id = 'user-' + id;
             
             const avatarContent = avatarUrl ? `<img src="${avatarUrl}">` : name.substring(0, 2).toUpperCase();
-            
-            let muteButtonHtml = "";
-            if (!isMe) {
-                muteButtonHtml = `<button class="mute-btn" onclick="toggleRemoteMute('${id}')" id="mute-icon-${id}">🔊</button>`;
-            }
+            const muteButtonHtml = !isMe ? `<button class="mute-btn" onclick="toggleRemoteMute('${id}')" id="mute-icon-${id}">🔊</button>` : '';
 
             div.innerHTML = `
                 <div class="user-info">
@@ -302,37 +314,25 @@
             userList.appendChild(div);
         }
 
-        muteSelfBtn.addEventListener('click', () => {
-            if (!localStream) return;
+        // Steuerung
+        document.getElementById('muteSelfBtn').addEventListener('click', () => {
             isMuted = !isMuted;
             localStream.getAudioTracks()[0].enabled = !isMuted;
-            
-            if (isMuted) {
-                muteSelfBtn.innerText = "Mikro an";
-                muteSelfBtn.style.backgroundColor = "#da373c";
-            } else {
-                muteSelfBtn.innerText = "Mikro aus";
-                muteSelfBtn.style.backgroundColor = "#4e5058";
-            }
+            const btn = document.getElementById('muteSelfBtn');
+            btn.innerText = isMuted ? "Mikro an" : "Mikro aus";
+            btn.style.backgroundColor = isMuted ? "#da373c" : "#4e5058";
         });
 
-        window.toggleRemoteMute = function(peerId) {
-            const audioElem = document.getElementById('audio-' + peerId);
-            const muteIcon = document.getElementById('mute-icon-' + peerId);
-            
-            if (audioElem) {
-                audioElem.muted = !audioElem.muted;
-                if (audioElem.muted) {
-                    muteIcon.innerText = "🔇";
-                } else {
-                    muteIcon.innerText = "🔊";
-                }
+        window.toggleRemoteMute = function(id) {
+            const audio = document.getElementById('audio-' + id);
+            const icon = document.getElementById('mute-icon-' + id);
+            if (audio) {
+                audio.muted = !audio.muted;
+                icon.innerText = audio.muted ? "🔇" : "🔊";
             }
-        }
+        };
 
-        leaveBtn.addEventListener('click', () => {
-            if (localStream) localStream.getTracks().forEach(track => track.stop());
-            if (peer) peer.destroy();
+        document.getElementById('leaveBtn').addEventListener('click', () => {
             location.reload();
         });
     </script>
