@@ -39,7 +39,6 @@
         }
         input:focus { outline: 1px solid #5865f2; }
         
-        /* Profilbild Upload Styling */
         .avatar-upload {
             text-align: center;
             margin-bottom: 15px;
@@ -140,6 +139,7 @@
             margin: 0;
         }
         .mute-btn:hover { color: white; background: none; }
+        #error-msg { color: #da373c; font-size: 13px; text-align: center; margin-top: 10px; display: none; }
     </style>
 </head>
 <body>
@@ -162,6 +162,7 @@
         </div>
 
         <button id="joinBtn">Beitreten</button>
+        <div id="error-msg">Dieser Name ist bereits vergeben!</div>
     </div>
 
     <!-- CALL SCREEN -->
@@ -169,9 +170,7 @@
         <h2>Haupt-Kanal</h2>
         <label>Teilnehmer</label>
         
-        <div class="user-list" id="userList">
-            <!-- Teilnehmerliste -->
-        </div>
+        <div class="user-list" id="userList"></div>
 
         <div class="controls">
             <button id="muteSelfBtn" class="btn-secondary">Mikro aus</button>
@@ -193,14 +192,17 @@
         const avatarPreview = document.getElementById('avatarPreview');
         const userList = document.getElementById('userList');
         const audioContainer = document.getElementById('audio-container');
+        const errorMsg = document.getElementById('error-msg');
 
         let peer;
         let localStream;
         let myName = "";
         let myAvatarUrl = "";
         let isMuted = false;
+        
+        // Liste aller bekannten Namen im Raum
+        const activeNames = new Set();
 
-        // Profilbild Auswahl verarbeiten
         avatarInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
@@ -216,9 +218,19 @@
         joinBtn.addEventListener('click', async () => {
             myName = usernameInput.value.trim();
             if (!myName) {
-                alert("Bitte gib einen Namen ein!");
+                errorMsg.innerText = "Bitte gib einen Namen ein!";
+                errorMsg.style.display = "block";
                 return;
             }
+
+            // Prüfen, ob der Name lokal schon existiert
+            if (activeNames.has(myName.toLowerCase())) {
+                errorMsg.innerText = "Dieser Name ist bereits vergeben!";
+                errorMsg.style.display = "block";
+                return;
+            }
+
+            errorMsg.style.display = "none";
 
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -226,17 +238,18 @@
                 lobbyScreen.style.display = 'none';
                 callScreen.style.display = 'block';
 
+                activeNames.add(myName.toLowerCase());
                 addUserToList(myName, myAvatarUrl, "local", true);
                 initPeerConnection();
 
             } catch (err) {
                 console.error(err);
-                alert("Mikrofon-Zugriff verweigert!");
+                errorMsg.innerText = "Mikrofon-Zugriff verweigert!";
+                errorMsg.style.display = "block";
             }
         });
 
         function initPeerConnection() {
-            // Alle nutzen denselben festen Basis-Raum "roblox-global-hauptkanal"
             peer = new Peer();
 
             peer.on('open', (id) => {
@@ -254,6 +267,8 @@
         function addUserToList(name, avatarUrl, id, isMe = false) {
             if (document.getElementById('user-' + id)) return;
             
+            activeNames.add(name.toLowerCase());
+
             const div = document.createElement('div');
             div.className = 'user-item';
             div.id = 'user-' + id;
@@ -284,10 +299,10 @@
             audio.id = 'audio-' + peerId;
             audioContainer.appendChild(audio);
 
+            // Platzhalter-Name, falls noch kein Namens-Datenaustausch stattgefunden hat
             addUserToList("Mitspieler", "", peerId, false);
         }
 
-        // Eigenes Mikrofon stummschalten
         muteSelfBtn.addEventListener('click', () => {
             if (!localStream) return;
             isMuted = !isMuted;
@@ -302,7 +317,6 @@
             }
         });
 
-        // Anderen Teilnehmer stummschalten (nur für dich hörbar)
         window.toggleRemoteMute = function(peerId) {
             const audioElem = document.getElementById('audio-' + peerId);
             const muteIcon = document.getElementById('mute-icon-' + peerId);
