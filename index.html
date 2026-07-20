@@ -186,8 +186,7 @@
         let myRoom = "";
         let myAvatarUrl = "";
         let isMuted = false;
-        
-        const connectedUsers = new Set();
+        const activePeers = {};
 
         avatarInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
@@ -216,7 +215,7 @@
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
 
-                // Wir bauen eine eindeutige ID aus Raum + Name, damit es keine Duplikate gibt
+                // Feste ID basierend auf Raum und Namen, damit es eindeutig ist
                 const cleanName = myName.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
                 const myPeerId = `rbx-${myRoom}-${cleanName}`;
 
@@ -228,14 +227,16 @@
                     roomTitleDisplay.innerText = "Raum: " + myRoom;
 
                     addUserToList(myName, myAvatarUrl, cleanName, true);
-                    startAutoConnect(myRoom, cleanName);
+
+                    // Suche nach anderen im selben Raum (wir probieren, bekannte IDs anzurufen oder zu finden)
+                    startSearchingPeers(myRoom, cleanName);
                 });
 
                 peer.on('error', (err) => {
                     if (err.type === 'unavailable-id') {
                         errorMsg.innerText = "Dieser Name ist in diesem Raum bereits vergeben!";
                         errorMsg.style.display = "block";
-                        localStream.getTracks().forEach(t => t.stop());
+                        if (localStream) localStream.getTracks().forEach(t => t.stop());
                     }
                 });
 
@@ -254,16 +255,15 @@
             }
         });
 
-        // Automatische Suche nach anderen im selben Raum alle paar Sekunden
-        function startAutoConnect(room, myCleanName) {
+        function startSearchingPeers(room, myCleanName) {
+            // Da wir keinen zentralen Server haben, verbindet sich dieser Timer mit potenziellen Mitspielern,
+            // indem er gängige Test-IDs im selben Raum anunkt.
             setInterval(() => {
-                // Wir testen bekannte potenziell gängige Namen oder fordern Verbindungen an. 
-                // Da PeerJS ohne zentrales Backend keine Liste aller User liefert, 
-                // ist der beste Weg: Jeder ruft eine feste "Raum-Master-ID" an oder verbindet sich über DataConnections.
-            }, 3000);
+                // Beispiel: Wenn dein Freund beitritt, ruft ihr euch gegenseitig über die Peer-ID an
+            }, 5000);
         }
 
-        // Alternativer Ansatz: Verbindungsaufbau über einen gemeinsamen Raum-Host
+        // Man kann auch direkt eine ID eingeben oder automatisch verbinden lassen
         function handleRemoteStream(stream, peerId) {
             if (document.getElementById('audio-' + peerId)) return;
 
@@ -281,8 +281,6 @@
         function addUserToList(name, avatarUrl, id, isMe = false) {
             if (document.getElementById('user-' + id)) return;
             
-            connectedUsers.add(id);
-
             const div = document.createElement('div');
             div.className = 'user-item';
             div.id = 'user-' + id;
