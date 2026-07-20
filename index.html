@@ -4,10 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hangout Hub</title>
-    <!-- PeerJS für WebRTC Verbindungen -->
+    <!-- PeerJS für zuverlässige P2P Audioverbindung -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        /* Discord-Style Theme Variablen */
         :root {
             --bg-color: #313338;
             --container-bg: #2b2d31;
@@ -38,7 +37,6 @@
             overflow: hidden;
         }
 
-        /* Lobby & Chat Container */
         .screen {
             background-color: var(--container-bg);
             padding: 30px;
@@ -47,7 +45,7 @@
             width: 100%;
             max-width: 450px;
             text-align: center;
-            display: none; /* Wird per JS umgeschaltet */
+            display: none;
         }
 
         .screen.active {
@@ -89,6 +87,25 @@
             outline: 2px solid var(--accent);
         }
 
+        .verify-box {
+            background: #1e1f22;
+            padding: 12px;
+            border-radius: 4px;
+            margin: 15px 0;
+            font-size: 13px;
+            text-align: left;
+            border-left: 4px solid var(--accent);
+        }
+
+        .code-display {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--accent);
+            letter-spacing: 2px;
+            margin: 5px 0;
+            user-select: all;
+        }
+
         button {
             width: 100%;
             padding: 12px;
@@ -116,10 +133,6 @@
             background-color: var(--error);
             margin-top: 20px;
         }
-        
-        .btn-leave:hover {
-            background-color: #c93b3e;
-        }
 
         .error-msg {
             color: var(--error);
@@ -128,7 +141,6 @@
             display: none;
         }
 
-        /* Voice Chat UI */
         #chat-screen {
             max-width: 800px;
             width: 90%;
@@ -158,7 +170,6 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            position: relative;
         }
 
         .avatar {
@@ -168,7 +179,6 @@
             background-color: var(--container-hover);
             margin-bottom: 10px;
             object-fit: cover;
-            border: 3px solid transparent;
         }
 
         .participant-name {
@@ -206,18 +216,22 @@
             <input type="text" id="roblox-name" placeholder="z. B. 1Bananiel1616" autocomplete="off">
         </div>
 
-        <!-- Der Raum-Input wurde entfernt. Es gibt nur noch den Beitreten/Weiter-Button -->
-        <button id="join-btn">Weiter</button>
+        <div class="verify-box">
+            <strong>Eigentums-Nachweis:</strong>
+            <div>Schreibe diesen Code kurz in deine Roblox-Bio ("Über mich"):</div>
+            <div id="verify-code" class="code-display">HUB-----</div>
+            <small style="color: var(--text-muted)">Nach dem Beitreten kannst du ihn wieder entfernen.</small>
+        </div>
+
+        <button id="join-btn">Beitreten</button>
         <div id="error-text" class="error-msg"></div>
     </div>
 
     <!-- VOICE CHAT SCREEN -->
     <div id="chat-screen" class="screen">
-        <h1 id="room-title">Hangout Hub - Global</h1>
+        <h1>Hangout Hub - Global</h1>
         
-        <div class="participants-grid" id="participants-list">
-            <!-- Teilnehmer werden hier dynamisch per JS generiert -->
-        </div>
+        <div class="participants-grid" id="participants-list"></div>
 
         <div class="controls">
             <button id="toggle-mic-btn">Mikrofon ausschalten</button>
@@ -226,103 +240,98 @@
     </div>
 
     <script>
-        // --- Globale Variablen ---
         let localStream = null;
         let peer = null;
         let myIndex = 0;
-        
-        // Da es nur noch einen Raum gibt, habe ich das Limit etwas erhöht.
-        // Beachte: P2P-Netzwerke ohne Server werden ab ca. 30-40 Leuten oft sehr rechenintensiv für den Browser.
-        const MAX_PEERS = 40; 
-        
-        // Der fest einprogrammierte, einzige Raumname
-        const GLOBAL_ROOM_NAME = 'global-hub';
-        
-        let baseRoomId = '';
+        const MAX_PEERS = 30;
+        const GLOBAL_ROOM = 'global-hub';
         let myInfo = { name: '', avatar: '' };
-        let peers = {}; // Speichert aktive Verbindungen
-        let meshInterval = null;
+        let peers = {};
+        let discoveryInterval = null;
 
-        // --- DOM Elemente ---
+        // Generiere Verifizierungscode beim Laden
+        const generatedCode = 'HUB-' + Math.floor(1000 + Math.random() * 9000);
+        document.getElementById('verify-code').innerText = generatedCode;
+
         const lobbyScreen = document.getElementById('lobby-screen');
         const chatScreen = document.getElementById('chat-screen');
         const joinBtn = document.getElementById('join-btn');
         const errorText = document.getElementById('error-text');
         const participantsList = document.getElementById('participants-list');
-        const toggleMicBtn = document.getElementById('toggleMic-btn') || document.getElementById('toggle-mic-btn');
+        const toggleMicBtn = document.getElementById('toggle-mic-btn');
         const leaveBtn = document.getElementById('leave-btn');
 
-        // --- 1. Roblox Verifizierung ---
-        async function verifyRobloxUser(username) {
-            try {
-                // Wir nutzen einen CORS-Proxy, um die Roblox-API im Browser abzufragen
-                const proxy = 'https://corsproxy.io/?';
-                const searchUrl = `https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(username)}&limit=10`;
-                
-                const res = await fetch(proxy + encodeURIComponent(searchUrl));
-                const data = await res.json();
-                
-                // Exakten Namen suchen (Case-Insensitive)
-                const user = data.data.find(u => u.name.toLowerCase() === username.toLowerCase());
-                
-                if (!user) return null; // Account existiert nicht
-
-                // Headshot laden
-                const avatarUrl = `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=150x150&format=Png&isCircular=true`;
-                const avatarRes = await fetch(proxy + encodeURIComponent(avatarUrl));
-                const avatarData = await avatarRes.json();
-                
-                return {
-                    name: user.name,
-                    avatar: avatarData.data[0].imageUrl
-                };
-            } catch (err) {
-                console.error("Roblox API Fehler:", err);
-                return null;
+        // Robustere Proxy-Abfrage
+        async function fetchRobloxData(url) {
+            const proxies = [
+                'https://api.allorigins.win/raw?url=',
+                'https://corsproxy.io/?'
+            ];
+            for (let proxy of proxies) {
+                try {
+                    const res = await fetch(proxy + encodeURIComponent(url));
+                    if (res.ok) return await res.json();
+                } catch (e) {
+                    continue;
+                }
             }
+            return null;
         }
 
-        // --- 2. Beitreten Logik ---
+        // Roblox Account & Bio Check
+        async function verifyRobloxAccount(username) {
+            const searchData = await fetchRobloxData(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(username)}&limit=10`);
+            if (!searchData || !searchData.data) return { error: "Verbindungsfehler zur Roblox API." };
+
+            const user = searchData.data.find(u => u.name.toLowerCase() === username.toLowerCase());
+            if (!user) return { error: "Dieser Roblox-Account existiert nicht." };
+
+            // Profil-Details prüfen (ob der Code in der Bio steht)
+            const userDetails = await fetchRobloxData(`https://users.roblox.com/v1/users/${user.id}`);
+            if (!userDetails || !userDetails.description || !userDetails.description.includes(generatedCode)) {
+                return { error: `Code '${generatedCode}' wurde nicht in deiner Roblox-Bio gefunden!` };
+            }
+
+            // Headshot Avatar laden
+            const avatarData = await fetchRobloxData(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=150x150&format=Png&isCircular=true`);
+            const avatarUrl = (avatarData && avatarData.data && avatarData.data[0]) ? avatarData.data[0].imageUrl : '';
+
+            return { name: user.name, avatar: avatarUrl };
+        }
+
         joinBtn.addEventListener('click', async () => {
             const username = document.getElementById('roblox-name').value.trim();
-
             if (!username) {
                 showError("Bitte gib deinen Roblox-Namen ein.");
                 return;
             }
 
             joinBtn.disabled = true;
-            joinBtn.innerText = "Verifiziere Account...";
+            joinBtn.innerText = "Prüfe Roblox Bio...";
             errorText.style.display = 'none';
 
-            // Roblox Check
-            const verifiedData = await verifyRobloxUser(username);
-            
-            if (!verifiedData) {
-                showError("Dieser Roblox-Account existiert nicht.");
+            const verification = await verifyRobloxAccount(username);
+            if (verification.error) {
+                showError(verification.error);
                 joinBtn.disabled = false;
-                joinBtn.innerText = "Weiter";
+                joinBtn.innerText = "Beitreten";
                 return;
             }
 
-            myInfo = verifiedData;
-            
+            myInfo = { name: verification.name, avatar: verification.avatar };
+
             try {
-                joinBtn.innerText = "Greife auf Mikrofon zu...";
-                // Mikrofon anfordern
+                joinBtn.innerText = "Starte Mikrofon...";
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                
-                // UI Wechseln
+
                 lobbyScreen.classList.remove('active');
                 chatScreen.classList.add('active');
 
-                // PeerJS initialisieren für den globalen Raum (Start bei Index 0)
-                initPeerMesh(GLOBAL_ROOM_NAME, 0);
-
+                initMeshNetwork(0);
             } catch (err) {
-                showError("Mikrofon-Zugriff verweigert!");
+                showError("Mikrofon-Zugriff fehlgeschlagen.");
                 joinBtn.disabled = false;
-                joinBtn.innerText = "Weiter";
+                joinBtn.innerText = "Beitreten";
             }
         });
 
@@ -331,123 +340,83 @@
             errorText.style.display = 'block';
         }
 
-        // --- 3. PeerJS Mesh-Netzwerk Logik ---
-        function initPeerMesh(room, index) {
+        // Synchronisierte P2P Mesh-Verbindung
+        function initMeshNetwork(index) {
             if (index > MAX_PEERS) {
-                alert("Der Hangout Hub ist momentan komplett voll (Maximal " + MAX_PEERS + " Spieler).");
+                alert("Raum ist voll.");
                 location.reload();
                 return;
             }
 
-            baseRoomId = `hghub-${room}`;
-            const myId = `${baseRoomId}-${index}`;
-
+            const myId = `hghub-${GLOBAL_ROOM}-${index}`;
             peer = new Peer(myId);
 
             peer.on('open', (id) => {
                 myIndex = index;
-                console.log("Verbunden als:", id);
-                
                 addParticipantToUI(myInfo.name, myInfo.avatar, id, true);
-                startMeshDiscovery();
+                
+                // Regelmäßiger Broadcast zur Wiederherstellung verloren gegangener Verbindungen
+                discoveryInterval = setInterval(syncPeers, 3000);
             });
 
             peer.on('error', (err) => {
-                // ID schon belegt -> Wir probieren den nächsten "Stuhl" im Raum
                 if (err.type === 'unavailable-id') {
                     peer.destroy();
-                    initPeerMesh(room, index + 1);
-                } else {
-                    console.error("PeerJS Fehler:", err);
+                    initMeshNetwork(index + 1);
                 }
             });
 
+            // Eingehender Daten-Handshake
             peer.on('connection', (conn) => {
                 conn.on('data', (data) => {
-                    if (data.type === 'hello') {
-                        peers[conn.peer] = { ...peers[conn.peer], info: data.info, conn };
+                    if (data.type === 'sync') {
+                        peers[conn.peer] = { conn, info: data.info };
                         addParticipantToUI(data.info.name, data.info.avatar, conn.peer, false);
-                        conn.send({ type: 'hello-back', info: myInfo });
+                        
+                        // Zwingender Rück-Handshake für ZWEI-WEGE Sichtbarkeit
+                        conn.send({ type: 'sync-ack', info: myInfo });
                     } 
-                    else if (data.type === 'hello-back') {
-                        peers[conn.peer] = { ...peers[conn.peer], info: data.info, conn };
+                    else if (data.type === 'sync-ack') {
+                        peers[conn.peer] = { conn, info: data.info };
                         addParticipantToUI(data.info.name, data.info.avatar, conn.peer, false);
                         
                         const remoteIndex = parseInt(conn.peer.split('-').pop());
                         if (myIndex < remoteIndex) {
-                            initiateCall(conn.peer);
+                            peer.call(conn.peer, localStream);
                         }
                     }
                 });
-
-                conn.on('close', () => removePeer(conn.peer));
             });
 
             peer.on('call', (call) => {
                 call.answer(localStream);
-                handleAudioStream(call);
-            });
-        }
-
-        function startMeshDiscovery() {
-            meshInterval = setInterval(() => {
-                for (let i = 0; i <= MAX_PEERS; i++) {
-                    if (i === myIndex) continue;
-                    
-                    const targetId = `${baseRoomId}-${i}`;
-                    if (!peers[targetId]) {
-                        connectToPeer(targetId, i);
+                call.on('stream', (remoteStream) => {
+                    let audio = document.getElementById(`audio-${call.peer}`);
+                    if (!audio) {
+                        audio = document.createElement('audio');
+                        audio.id = `audio-${call.peer}`;
+                        audio.autoplay = true;
+                        document.body.appendChild(audio);
                     }
-                }
-            }, 3000);
-        }
-
-        function connectToPeer(targetId, targetIndex) {
-            peers[targetId] = { pending: true };
-
-            const conn = peer.connect(targetId);
-            
-            conn.on('open', () => {
-                peers[targetId] = { conn };
-                conn.send({ type: 'hello', info: myInfo });
-            });
-
-            conn.on('close', () => removePeer(targetId));
-            conn.on('error', () => removePeer(targetId));
-        }
-
-        function initiateCall(targetId) {
-            const call = peer.call(targetId, localStream);
-            handleAudioStream(call);
-        }
-
-        function handleAudioStream(call) {
-            call.on('stream', (remoteStream) => {
-                if (!document.getElementById(`audio-${call.peer}`)) {
-                    const audio = document.createElement('audio');
-                    audio.id = `audio-${call.peer}`;
                     audio.srcObject = remoteStream;
-                    audio.autoplay = true;
-                    document.body.appendChild(audio);
-                }
+                });
             });
-
-            call.on('close', () => removePeer(call.peer));
-            call.on('error', () => removePeer(call.peer));
         }
 
-        function removePeer(peerId) {
-            if (peers[peerId]) {
-                delete peers[peerId];
+        function syncPeers() {
+            for (let i = 0; i <= MAX_PEERS; i++) {
+                if (i === myIndex) continue;
+                const targetId = `hghub-${GLOBAL_ROOM}-${i}`;
+                
+                if (!peers[targetId] || !peers[targetId].conn || !peers[targetId].conn.open) {
+                    const conn = peer.connect(targetId);
+                    conn.on('open', () => {
+                        conn.send({ type: 'sync', info: myInfo });
+                    });
+                }
             }
-            const card = document.getElementById(`card-${peerId}`);
-            if (card) card.remove();
-            
-            const audio = document.getElementById(`audio-${peerId}`);
-            if (audio) audio.remove();
         }
 
-        // --- 4. UI Funktionen ---
         function addParticipantToUI(name, avatarUrl, peerId, isMe) {
             if (document.getElementById(`card-${peerId}`)) return;
 
@@ -457,8 +426,7 @@
 
             const img = document.createElement('img');
             img.className = 'avatar';
-            img.src = avatarUrl;
-            img.alt = name;
+            img.src = avatarUrl || 'https://tr.rbxcdn.com/30bf3239a58495a882a4d52e505a74e5/150/150/AvatarHeadshot/Png';
 
             const nameEl = document.createElement('div');
             nameEl.className = 'participant-name';
@@ -501,10 +469,9 @@
         leaveBtn.addEventListener('click', () => {
             if (peer) peer.destroy();
             if (localStream) localStream.getTracks().forEach(track => track.stop());
-            if (meshInterval) clearInterval(meshInterval);
-            location.reload(); 
+            if (discoveryInterval) clearInterval(discoveryInterval);
+            location.reload();
         });
-
     </script>
 </body>
 </html>
