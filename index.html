@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Discord-Style Sprachchat</title>
+    <title>Roblox Voice Hub</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -39,10 +39,7 @@
         }
         input:focus { outline: 1px solid #5865f2; }
         
-        .avatar-upload {
-            text-align: center;
-            margin-bottom: 15px;
-        }
+        .avatar-upload { text-align: center; margin-bottom: 15px; }
         .avatar-preview {
             width: 70px;
             height: 70px;
@@ -59,11 +56,7 @@
             border: 2px solid #4752c4;
             cursor: pointer;
         }
-        .avatar-preview img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+        .avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
         input[type="file"] { display: none; }
 
         button {
@@ -99,10 +92,7 @@
             background-color: #2b2d31;
             border-radius: 4px;
         }
-        .user-info {
-            display: flex;
-            align-items: center;
-        }
+        .user-info { display: flex; align-items: center; }
         .avatar-small {
             width: 32px;
             height: 32px;
@@ -119,24 +109,13 @@
         }
         .avatar-small img { width: 100%; height: 100%; object-fit: cover; }
         
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
+        .controls { display: flex; gap: 10px; margin-top: 20px; }
         .btn-secondary { background-color: #4e5058; }
         .btn-secondary:hover { background-color: #6d6f78; }
         .btn-danger { background-color: #da373c; }
         .btn-danger:hover { background-color: #a1282c; }
         .mute-btn {
-            background: none;
-            border: none;
-            color: #949ba4;
-            cursor: pointer;
-            font-size: 16px;
-            padding: 4px 8px;
-            width: auto;
-            margin: 0;
+            background: none; border: none; color: #949ba4; cursor: pointer; font-size: 16px; padding: 4px 8px; width: auto; margin: 0;
         }
         .mute-btn:hover { color: white; background: none; }
         #error-msg { color: #da373c; font-size: 13px; text-align: center; margin-top: 10px; display: none; }
@@ -146,28 +125,33 @@
 
     <!-- LOBBY SCREEN -->
     <div class="container" id="lobby-screen">
-        <h2>Sprachkanal</h2>
+        <h2>Roblox Voice Hub</h2>
         
         <div class="avatar-upload">
             <label for="avatarInput">
-                <div class="avatar-preview" id="avatarPreview">JD</div>
+                <div class="avatar-preview" id="avatarPreview">RB</div>
             </label>
             <input type="file" id="avatarInput" accept="image/*">
-            <span style="font-size: 11px; color: #949ba4;">Klicken, um Profilbild zu wählen</span>
+            <span style="font-size: 11px; color: #949ba4;">Profilbild auswählen</span>
         </div>
 
         <div class="input-group">
-            <label>Dein Name</label>
+            <label>Dein Roblox-Name</label>
             <input type="text" id="usernameInput" placeholder="z. B. 1Bananiel1616">
         </div>
 
-        <button id="joinBtn">Beitreten</button>
-        <div id="error-msg">Dieser Name ist bereits vergeben!</div>
+        <div class="input-group">
+            <label>Raum-Name (Muss exakt übereinstimmen!)</label>
+            <input type="text" id="roomInput" placeholder="z. B. hangouthub">
+        </div>
+
+        <button id="joinBtn">Verbinden</button>
+        <div id="error-msg">Fehler</div>
     </div>
 
     <!-- CALL SCREEN -->
     <div class="container" id="call-screen">
-        <h2>Haupt-Kanal</h2>
+        <h2 id="roomTitleDisplay">Kanal</h2>
         <label>Teilnehmer</label>
         
         <div class="user-list" id="userList"></div>
@@ -188,20 +172,20 @@
         const leaveBtn = document.getElementById('leaveBtn');
         const muteSelfBtn = document.getElementById('muteSelfBtn');
         const usernameInput = document.getElementById('usernameInput');
+        const roomInput = document.getElementById('roomInput');
         const avatarInput = document.getElementById('avatarInput');
         const avatarPreview = document.getElementById('avatarPreview');
         const userList = document.getElementById('userList');
         const audioContainer = document.getElementById('audio-container');
         const errorMsg = document.getElementById('error-msg');
+        const roomTitleDisplay = document.getElementById('roomTitleDisplay');
 
         let peer;
         let localStream;
         let myName = "";
+        let myRoom = "";
         let myAvatarUrl = "";
         let isMuted = false;
-        
-        // Liste aller bekannten Namen im Raum
-        const activeNames = new Set();
 
         avatarInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
@@ -217,15 +201,10 @@
 
         joinBtn.addEventListener('click', async () => {
             myName = usernameInput.value.trim();
-            if (!myName) {
-                errorMsg.innerText = "Bitte gib einen Namen ein!";
-                errorMsg.style.display = "block";
-                return;
-            }
+            myRoom = roomInput.value.trim().toLowerCase();
 
-            // Prüfen, ob der Name lokal schon existiert
-            if (activeNames.has(myName.toLowerCase())) {
-                errorMsg.innerText = "Dieser Name ist bereits vergeben!";
+            if (!myName || !myRoom) {
+                errorMsg.innerText = "Bitte Namen und Raum eingeben!";
                 errorMsg.style.display = "block";
                 return;
             }
@@ -237,9 +216,8 @@
 
                 lobbyScreen.style.display = 'none';
                 callScreen.style.display = 'block';
+                roomTitleDisplay.innerText = "Raum: " + myRoom;
 
-                activeNames.add(myName.toLowerCase());
-                addUserToList(myName, myAvatarUrl, "local", true);
                 initPeerConnection();
 
             } catch (err) {
@@ -250,10 +228,27 @@
         });
 
         function initPeerConnection() {
-            peer = new Peer();
+            // Wir nutzen den Raumnamen fest im Peer-ID-Präfix, damit man sich im selben Raum findet
+            // Format: roblox-chat-[raumname]-[deinname]
+            const cleanName = myName.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+            const peerId = "rbx-" + myRoom + "-" + cleanName;
+
+            peer = new Peer(peerId);
 
             peer.on('open', (id) => {
-                console.log("Eigene ID: " + id);
+                console.log("Erfolgreich verbunden als: " + id);
+                addUserToList(myName, myAvatarUrl, cleanName, true);
+
+                // Versuche direkt, den Host/Partner im selben Raum anzurufen (z.B. Test mit bekannten Namen)
+                // Da PeerJS ohne Server keine automatische Raumliste hat, verbindet sich dieses System
+                // am besten, indem ihr wisst, wie der andere heißt, ODER ihr nutzt die ID des Partners.
+            });
+
+            peer.on('error', (err) => {
+                if (err.type === 'unavailable-id') {
+                    alert("Dieser Name ist in diesem Raum bereits vergeben! Bitte wähle einen anderen.");
+                    location.reload();
+                }
             });
 
             peer.on('call', (call) => {
@@ -267,8 +262,6 @@
         function addUserToList(name, avatarUrl, id, isMe = false) {
             if (document.getElementById('user-' + id)) return;
             
-            activeNames.add(name.toLowerCase());
-
             const div = document.createElement('div');
             div.className = 'user-item';
             div.id = 'user-' + id;
@@ -299,8 +292,10 @@
             audio.id = 'audio-' + peerId;
             audioContainer.appendChild(audio);
 
-            // Platzhalter-Name, falls noch kein Namens-Datenaustausch stattgefunden hat
-            addUserToList("Mitspieler", "", peerId, false);
+            // Den Namen aus der Peer-ID extrahieren (rbx-raum-name)
+            const parts = peerId.split('-');
+            const remoteName = parts.slice(2).join('-') || "Mitspieler";
+            addUserToList(remoteName, "", parts[parts.length - 1], false);
         }
 
         muteSelfBtn.addEventListener('click', () => {
