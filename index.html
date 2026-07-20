@@ -3,338 +3,508 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Hub</title>
+    <title>Hangout Hub</title>
+    <!-- PeerJS für WebRTC Verbindungen -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #313338;
-            color: #dbdee1;
+        /* Discord-Style Theme Variablen */
+        :root {
+            --bg-color: #313338;
+            --container-bg: #2b2d31;
+            --container-hover: #35373c;
+            --accent: #5865f2;
+            --accent-hover: #4752c4;
+            --text-main: #dbdee1;
+            --text-muted: #949ba4;
+            --error: #ed4245;
+            --success: #23a559;
+            --border-radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
             margin: 0;
-            padding: 20px;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
+            overflow: hidden;
         }
-        .container {
-            background-color: #2b2d31;
+
+        /* Lobby & Chat Container */
+        .screen {
+            background-color: var(--container-bg);
             padding: 30px;
-            border-radius: 8px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
             width: 100%;
-            max-width: 400px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            max-width: 450px;
+            text-align: center;
+            display: none; /* Wird per JS umgeschaltet */
         }
-        h2 { color: #f2f3f5; margin-top: 0; text-align: center; }
-        .input-group { margin-bottom: 15px; }
-        label { display: block; font-size: 12px; font-weight: bold; color: #949ba4; margin-bottom: 6px; text-transform: uppercase; }
-        input[type="text"] {
+
+        .screen.active {
+            display: block;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #ffffff;
+        }
+
+        .input-group {
+            text-align: left;
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        input {
             width: 100%;
             padding: 10px;
-            font-size: 14px;
             background-color: #1e1f22;
             border: none;
             border-radius: 4px;
-            color: #dbdee1;
-            box-sizing: border-box;
+            color: var(--text-main);
+            font-size: 16px;
+            outline: none;
         }
-        input:focus { outline: 1px solid #5865f2; }
-        
-        .avatar-upload { text-align: center; margin-bottom: 15px; }
-        .avatar-preview {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            background-color: #5865f2;
-            margin: 0 auto 10px auto;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            color: white;
-            font-size: 20px;
-            overflow: hidden;
-            border: 2px solid #4752c4;
-            cursor: pointer;
+
+        input:focus {
+            outline: 2px solid var(--accent);
         }
-        .avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
-        input[type="file"] { display: none; }
 
         button {
             width: 100%;
             padding: 12px;
-            font-size: 15px;
-            font-weight: bold;
-            background-color: #5865f2;
+            background-color: var(--accent);
             color: white;
             border: none;
             border-radius: 4px;
+            font-size: 16px;
+            font-weight: bold;
             cursor: pointer;
+            transition: background-color 0.2s;
             margin-top: 10px;
         }
-        button:hover { background-color: #4752c4; }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        button:disabled {
+            background-color: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        .btn-leave {
+            background-color: var(--error);
+            margin-top: 20px;
+        }
         
-        #call-screen { display: none; }
-        .user-list {
-            background-color: #1e1f22;
-            border-radius: 6px;
-            padding: 10px;
-            margin-top: 15px;
-            min-height: 120px;
-            max-height: 200px;
+        .btn-leave:hover {
+            background-color: #c93b3e;
+        }
+
+        .error-msg {
+            color: var(--error);
+            font-size: 14px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        /* Voice Chat UI */
+        #chat-screen {
+            max-width: 800px;
+            width: 90%;
+            height: 80vh;
+            display: none;
+            flex-direction: column;
+        }
+
+        #chat-screen.active {
+            display: flex;
+        }
+
+        .participants-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
             overflow-y: auto;
+            flex-grow: 1;
+            padding: 10px;
         }
-        .user-item {
+
+        .participant-card {
+            background-color: var(--bg-color);
+            border-radius: var(--border-radius);
+            padding: 15px;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: space-between;
-            padding: 8px;
-            margin-bottom: 5px;
-            background-color: #2b2d31;
-            border-radius: 4px;
+            position: relative;
         }
-        .user-info { display: flex; align-items: center; }
-        .avatar-small {
-            width: 32px;
-            height: 32px;
+
+        .avatar {
+            width: 80px;
+            height: 80px;
             border-radius: 50%;
-            background-color: #5865f2;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            background-color: var(--container-hover);
+            margin-bottom: 10px;
+            object-fit: cover;
+            border: 3px solid transparent;
+        }
+
+        .participant-name {
             font-weight: bold;
-            color: white;
-            margin-right: 10px;
+            font-size: 14px;
+            word-break: break-all;
+            text-align: center;
+        }
+
+        .mute-toggle {
+            margin-top: 10px;
+            background-color: var(--container-hover);
+            padding: 5px 10px;
             font-size: 12px;
-            overflow: hidden;
+            width: auto;
         }
-        .avatar-small img { width: 100%; height: 100%; object-fit: cover; }
-        
-        .controls { display: flex; gap: 10px; margin-top: 20px; }
-        .btn-secondary { background-color: #4e5058; }
-        .btn-secondary:hover { background-color: #6d6f78; }
-        .btn-danger { background-color: #da373c; }
-        .btn-danger:hover { background-color: #a1282c; }
-        .mute-btn {
-            background: none; border: none; color: #949ba4; cursor: pointer; font-size: 16px; padding: 4px 8px; width: auto; margin: 0;
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid var(--bg-color);
+            padding-top: 20px;
         }
-        .mute-btn:hover { color: white; background: none; }
-        #error-msg { color: #da373c; font-size: 13px; text-align: center; margin-top: 10px; display: none; }
     </style>
 </head>
 <body>
 
-    <!-- LOBBY -->
-    <div class="container" id="lobby-screen">
-        <h2>Voice Hub Lobby</h2>
+    <!-- LOBBY SCREEN -->
+    <div id="lobby-screen" class="screen active">
+        <h1>Hangout Hub</h1>
         
-        <div class="avatar-upload">
-            <label for="avatarInput">
-                <div class="avatar-preview" id="avatarPreview">VH</div>
-            </label>
-            <input type="file" id="avatarInput" accept="image/*">
-        </div>
-
         <div class="input-group">
-            <label>Dein Name</label>
-            <input type="text" id="usernameInput" placeholder="z. B. 1Bananiel1616">
+            <label for="roblox-name">Roblox Benutzername</label>
+            <input type="text" id="roblox-name" placeholder="z. B. 1Bananiel1616" autocomplete="off">
         </div>
 
-        <div class="input-group">
-            <label>Raum-Name</label>
-            <input type="text" id="roomInput" placeholder="z. B. main">
-        </div>
-
-        <button id="joinBtn">Beitreten</button>
-        <div id="error-msg">Dieser Name ist bereits im Raum vergeben!</div>
+        <!-- Der Raum-Input wurde entfernt. Es gibt nur noch den Beitreten/Weiter-Button -->
+        <button id="join-btn">Weiter</button>
+        <div id="error-text" class="error-msg"></div>
     </div>
 
-    <!-- CALL SCREEN -->
-    <div class="container" id="call-screen">
-        <h2 id="roomTitleDisplay">Kanal</h2>
-        <label>Teilnehmer</label>
+    <!-- VOICE CHAT SCREEN -->
+    <div id="chat-screen" class="screen">
+        <h1 id="room-title">Hangout Hub - Global</h1>
         
-        <div class="user-list" id="userList"></div>
+        <div class="participants-grid" id="participants-list">
+            <!-- Teilnehmer werden hier dynamisch per JS generiert -->
+        </div>
 
         <div class="controls">
-            <button id="muteSelfBtn" class="btn-secondary">Mikro aus</button>
-            <button id="leaveBtn" class="btn-danger">Verlassen</button>
+            <button id="toggle-mic-btn">Mikrofon ausschalten</button>
+            <button id="leave-btn" class="btn-leave">Verlassen</button>
         </div>
     </div>
 
-    <div id="audio-container" style="display:none;"></div>
-
-    <script src="/socket.io/socket.io.js"></script>
     <script>
-        const socket = io();
-        let localStream;
-        let isMuted = false;
-        const peers = {}; // Speichert WebRTC Verbindungen
+        // --- Globale Variablen ---
+        let localStream = null;
+        let peer = null;
+        let myIndex = 0;
+        
+        // Da es nur noch einen Raum gibt, habe ich das Limit etwas erhöht.
+        // Beachte: P2P-Netzwerke ohne Server werden ab ca. 30-40 Leuten oft sehr rechenintensiv für den Browser.
+        const MAX_PEERS = 40; 
+        
+        // Der fest einprogrammierte, einzige Raumname
+        const GLOBAL_ROOM_NAME = 'global-hub';
+        
+        let baseRoomId = '';
+        let myInfo = { name: '', avatar: '' };
+        let peers = {}; // Speichert aktive Verbindungen
+        let meshInterval = null;
 
-        // UI Elemente
+        // --- DOM Elemente ---
         const lobbyScreen = document.getElementById('lobby-screen');
-        const callScreen = document.getElementById('call-screen');
-        const errorMsg = document.getElementById('error-msg');
-        const userList = document.getElementById('userList');
-        let myAvatarUrl = "";
-        let myName = "";
+        const chatScreen = document.getElementById('chat-screen');
+        const joinBtn = document.getElementById('join-btn');
+        const errorText = document.getElementById('error-text');
+        const participantsList = document.getElementById('participants-list');
+        const toggleMicBtn = document.getElementById('toggleMic-btn') || document.getElementById('toggle-mic-btn');
+        const leaveBtn = document.getElementById('leave-btn');
 
-        // Profilbild hochladen
-        document.getElementById('avatarInput').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    myAvatarUrl = event.target.result;
-                    document.getElementById('avatarPreview').innerHTML = `<img src="${myAvatarUrl}">`;
-                }
-                reader.readAsDataURL(file);
-            }
-        });
-
-        // Beitreten
-        document.getElementById('joinBtn').addEventListener('click', async () => {
-            myName = document.getElementById('usernameInput').value.trim();
-            const roomName = document.getElementById('roomInput').value.trim().toLowerCase();
-
-            if (!myName || !roomName) return;
-
+        // --- 1. Roblox Verifizierung ---
+        async function verifyRobloxUser(username) {
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                socket.emit('join-room', roomName, myName, myAvatarUrl);
-                document.getElementById('roomTitleDisplay').innerText = "Raum: " + roomName;
+                // Wir nutzen einen CORS-Proxy, um die Roblox-API im Browser abzufragen
+                const proxy = 'https://corsproxy.io/?';
+                const searchUrl = `https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(username)}&limit=10`;
+                
+                const res = await fetch(proxy + encodeURIComponent(searchUrl));
+                const data = await res.json();
+                
+                // Exakten Namen suchen (Case-Insensitive)
+                const user = data.data.find(u => u.name.toLowerCase() === username.toLowerCase());
+                
+                if (!user) return null; // Account existiert nicht
+
+                // Headshot laden
+                const avatarUrl = `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=150x150&format=Png&isCircular=true`;
+                const avatarRes = await fetch(proxy + encodeURIComponent(avatarUrl));
+                const avatarData = await avatarRes.json();
+                
+                return {
+                    name: user.name,
+                    avatar: avatarData.data[0].imageUrl
+                };
             } catch (err) {
-                alert("Mikrofon-Zugriff verweigert!");
+                console.error("Roblox API Fehler:", err);
+                return null;
             }
-        });
+        }
 
-        // Server-Antworten
-        socket.on('name-taken', () => {
-            errorMsg.style.display = "block";
-            localStream.getTracks().forEach(t => t.stop());
-        });
+        // --- 2. Beitreten Logik ---
+        joinBtn.addEventListener('click', async () => {
+            const username = document.getElementById('roblox-name').value.trim();
 
-        socket.on('room-users', (users) => {
-            lobbyScreen.style.display = 'none';
-            callScreen.style.display = 'block';
-            errorMsg.style.display = "none";
+            if (!username) {
+                showError("Bitte gib deinen Roblox-Namen ein.");
+                return;
+            }
+
+            joinBtn.disabled = true;
+            joinBtn.innerText = "Verifiziere Account...";
+            errorText.style.display = 'none';
+
+            // Roblox Check
+            const verifiedData = await verifyRobloxUser(username);
             
-            // Mich selbst hinzufügen
-            addUserToUI(socket.id, myName, myAvatarUrl, true);
+            if (!verifiedData) {
+                showError("Dieser Roblox-Account existiert nicht.");
+                joinBtn.disabled = false;
+                joinBtn.innerText = "Weiter";
+                return;
+            }
 
-            // Andere hinzufügen und anrufen
-            for (const id in users) {
-                if (id !== socket.id) {
-                    addUserToUI(id, users[id].username, users[id].avatar, false);
-                    createPeerConnection(id, true);
-                }
+            myInfo = verifiedData;
+            
+            try {
+                joinBtn.innerText = "Greife auf Mikrofon zu...";
+                // Mikrofon anfordern
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                
+                // UI Wechseln
+                lobbyScreen.classList.remove('active');
+                chatScreen.classList.add('active');
+
+                // PeerJS initialisieren für den globalen Raum (Start bei Index 0)
+                initPeerMesh(GLOBAL_ROOM_NAME, 0);
+
+            } catch (err) {
+                showError("Mikrofon-Zugriff verweigert!");
+                joinBtn.disabled = false;
+                joinBtn.innerText = "Weiter";
             }
         });
 
-        socket.on('user-connected', (id, username, avatar) => {
-            addUserToUI(id, username, avatar, false);
-            createPeerConnection(id, false);
-        });
+        function showError(msg) {
+            errorText.innerText = msg;
+            errorText.style.display = 'block';
+        }
 
-        socket.on('user-disconnected', (id) => {
-            if (peers[id]) peers[id].close();
-            delete peers[id];
-            const userEl = document.getElementById('user-' + id);
-            if (userEl) userEl.remove();
-            const audioEl = document.getElementById('audio-' + id);
-            if (audioEl) audioEl.remove();
-        });
+        // --- 3. PeerJS Mesh-Netzwerk Logik ---
+        function initPeerMesh(room, index) {
+            if (index > MAX_PEERS) {
+                alert("Der Hangout Hub ist momentan komplett voll (Maximal " + MAX_PEERS + " Spieler).");
+                location.reload();
+                return;
+            }
 
-        // WebRTC Logik
-        function createPeerConnection(id, isCaller) {
-            const peer = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            baseRoomId = `hghub-${room}`;
+            const myId = `${baseRoomId}-${index}`;
+
+            peer = new Peer(myId);
+
+            peer.on('open', (id) => {
+                myIndex = index;
+                console.log("Verbunden als:", id);
+                
+                addParticipantToUI(myInfo.name, myInfo.avatar, id, true);
+                startMeshDiscovery();
             });
-            peers[id] = peer;
 
-            localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
-
-            peer.ontrack = (event) => {
-                let audio = document.getElementById('audio-' + id);
-                if (!audio) {
-                    audio = document.createElement('audio');
-                    audio.id = 'audio-' + id;
-                    audio.autoplay = true;
-                    document.getElementById('audio-container').appendChild(audio);
+            peer.on('error', (err) => {
+                // ID schon belegt -> Wir probieren den nächsten "Stuhl" im Raum
+                if (err.type === 'unavailable-id') {
+                    peer.destroy();
+                    initPeerMesh(room, index + 1);
+                } else {
+                    console.error("PeerJS Fehler:", err);
                 }
-                audio.srcObject = event.streams[0];
-            };
+            });
 
-            peer.onicecandidate = (event) => {
-                if (event.candidate) socket.emit('candidate', id, event.candidate);
-            };
-
-            if (isCaller) {
-                peer.createOffer().then(offer => {
-                    peer.setLocalDescription(offer);
-                    socket.emit('offer', id, offer);
+            peer.on('connection', (conn) => {
+                conn.on('data', (data) => {
+                    if (data.type === 'hello') {
+                        peers[conn.peer] = { ...peers[conn.peer], info: data.info, conn };
+                        addParticipantToUI(data.info.name, data.info.avatar, conn.peer, false);
+                        conn.send({ type: 'hello-back', info: myInfo });
+                    } 
+                    else if (data.type === 'hello-back') {
+                        peers[conn.peer] = { ...peers[conn.peer], info: data.info, conn };
+                        addParticipantToUI(data.info.name, data.info.avatar, conn.peer, false);
+                        
+                        const remoteIndex = parseInt(conn.peer.split('-').pop());
+                        if (myIndex < remoteIndex) {
+                            initiateCall(conn.peer);
+                        }
+                    }
                 });
-            }
+
+                conn.on('close', () => removePeer(conn.peer));
+            });
+
+            peer.on('call', (call) => {
+                call.answer(localStream);
+                handleAudioStream(call);
+            });
         }
 
-        socket.on('offer', (id, description) => {
-            peers[id].setRemoteDescription(description)
-                .then(() => peers[id].createAnswer())
-                .then(answer => {
-                    peers[id].setLocalDescription(answer);
-                    socket.emit('answer', id, answer);
-                });
-        });
-
-        socket.on('answer', (id, description) => {
-            peers[id].setRemoteDescription(description);
-        });
-
-        socket.on('candidate', (id, candidate) => {
-            peers[id].addIceCandidate(new RTCIceCandidate(candidate));
-        });
-
-        // UI Hilfsfunktionen
-        function addUserToUI(id, name, avatarUrl, isMe) {
-            if (document.getElementById('user-' + id)) return;
-            
-            const div = document.createElement('div');
-            div.className = 'user-item';
-            div.id = 'user-' + id;
-            
-            const avatarContent = avatarUrl ? `<img src="${avatarUrl}">` : name.substring(0, 2).toUpperCase();
-            const muteButtonHtml = !isMe ? `<button class="mute-btn" onclick="toggleRemoteMute('${id}')" id="mute-icon-${id}">🔊</button>` : '';
-
-            div.innerHTML = `
-                <div class="user-info">
-                    <div class="avatar-small">${avatarContent}</div>
-                    <div><strong>${name}</strong> ${isMe ? '(Du)' : ''}</div>
-                </div>
-                ${muteButtonHtml}
-            `;
-            userList.appendChild(div);
+        function startMeshDiscovery() {
+            meshInterval = setInterval(() => {
+                for (let i = 0; i <= MAX_PEERS; i++) {
+                    if (i === myIndex) continue;
+                    
+                    const targetId = `${baseRoomId}-${i}`;
+                    if (!peers[targetId]) {
+                        connectToPeer(targetId, i);
+                    }
+                }
+            }, 3000);
         }
 
-        // Steuerung
-        document.getElementById('muteSelfBtn').addEventListener('click', () => {
-            isMuted = !isMuted;
-            localStream.getAudioTracks()[0].enabled = !isMuted;
-            const btn = document.getElementById('muteSelfBtn');
-            btn.innerText = isMuted ? "Mikro an" : "Mikro aus";
-            btn.style.backgroundColor = isMuted ? "#da373c" : "#4e5058";
-        });
+        function connectToPeer(targetId, targetIndex) {
+            peers[targetId] = { pending: true };
 
-        window.toggleRemoteMute = function(id) {
-            const audio = document.getElementById('audio-' + id);
-            const icon = document.getElementById('mute-icon-' + id);
-            if (audio) {
-                audio.muted = !audio.muted;
-                icon.innerText = audio.muted ? "🔇" : "🔊";
+            const conn = peer.connect(targetId);
+            
+            conn.on('open', () => {
+                peers[targetId] = { conn };
+                conn.send({ type: 'hello', info: myInfo });
+            });
+
+            conn.on('close', () => removePeer(targetId));
+            conn.on('error', () => removePeer(targetId));
+        }
+
+        function initiateCall(targetId) {
+            const call = peer.call(targetId, localStream);
+            handleAudioStream(call);
+        }
+
+        function handleAudioStream(call) {
+            call.on('stream', (remoteStream) => {
+                if (!document.getElementById(`audio-${call.peer}`)) {
+                    const audio = document.createElement('audio');
+                    audio.id = `audio-${call.peer}`;
+                    audio.srcObject = remoteStream;
+                    audio.autoplay = true;
+                    document.body.appendChild(audio);
+                }
+            });
+
+            call.on('close', () => removePeer(call.peer));
+            call.on('error', () => removePeer(call.peer));
+        }
+
+        function removePeer(peerId) {
+            if (peers[peerId]) {
+                delete peers[peerId];
             }
-        };
+            const card = document.getElementById(`card-${peerId}`);
+            if (card) card.remove();
+            
+            const audio = document.getElementById(`audio-${peerId}`);
+            if (audio) audio.remove();
+        }
 
-        document.getElementById('leaveBtn').addEventListener('click', () => {
-            location.reload();
+        // --- 4. UI Funktionen ---
+        function addParticipantToUI(name, avatarUrl, peerId, isMe) {
+            if (document.getElementById(`card-${peerId}`)) return;
+
+            const card = document.createElement('div');
+            card.className = 'participant-card';
+            card.id = `card-${peerId}`;
+
+            const img = document.createElement('img');
+            img.className = 'avatar';
+            img.src = avatarUrl;
+            img.alt = name;
+
+            const nameEl = document.createElement('div');
+            nameEl.className = 'participant-name';
+            nameEl.innerText = name + (isMe ? " (Du)" : "");
+
+            card.appendChild(img);
+            card.appendChild(nameEl);
+
+            if (!isMe) {
+                const muteBtn = document.createElement('button');
+                muteBtn.className = 'mute-toggle';
+                muteBtn.innerText = 'Stummschalten';
+                
+                let isMuted = false;
+                muteBtn.onclick = () => {
+                    const audioEl = document.getElementById(`audio-${peerId}`);
+                    if (audioEl) {
+                        isMuted = !isMuted;
+                        audioEl.muted = isMuted;
+                        muteBtn.innerText = isMuted ? 'Entstummen' : 'Stummschalten';
+                        muteBtn.style.backgroundColor = isMuted ? 'var(--error)' : 'var(--container-hover)';
+                    }
+                };
+                card.appendChild(muteBtn);
+            }
+
+            participantsList.appendChild(card);
+        }
+
+        let micEnabled = true;
+        toggleMicBtn.addEventListener('click', () => {
+            if (localStream) {
+                micEnabled = !micEnabled;
+                localStream.getAudioTracks()[0].enabled = micEnabled;
+                toggleMicBtn.innerText = micEnabled ? "Mikrofon ausschalten" : "Mikrofon anschalten";
+                toggleMicBtn.style.backgroundColor = micEnabled ? "var(--accent)" : "var(--error)";
+            }
         });
+
+        leaveBtn.addEventListener('click', () => {
+            if (peer) peer.destroy();
+            if (localStream) localStream.getTracks().forEach(track => track.stop());
+            if (meshInterval) clearInterval(meshInterval);
+            location.reload(); 
+        });
+
     </script>
 </body>
 </html>
