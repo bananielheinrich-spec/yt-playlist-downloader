@@ -118,6 +118,10 @@
             cursor: pointer;
             transition: background-color 0.2s;
             margin-top: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
         }
 
         button:hover {
@@ -132,6 +136,10 @@
         .btn-leave {
             background-color: var(--error);
             margin-top: 20px;
+        }
+        
+        .btn-leave:hover {
+            background-color: #c93b3e;
         }
 
         .error-msg {
@@ -188,12 +196,23 @@
             text-align: center;
         }
 
-        .mute-toggle {
+        /* Icon-Button für lokales Muten in der Karte */
+        .icon-btn {
             margin-top: 10px;
             background-color: var(--container-hover);
-            padding: 5px 10px;
+            padding: 8px;
             font-size: 12px;
             width: auto;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .icon-btn:hover {
+            background-color: #3f4248;
         }
 
         .controls {
@@ -234,7 +253,11 @@
         <div class="participants-grid" id="participants-list"></div>
 
         <div class="controls">
-            <button id="toggle-mic-btn">Mikrofon ausschalten</button>
+            <button id="toggle-mic-btn">
+                <!-- Mikrofon Icon (An) -->
+                <svg id="mic-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v1a7 7 0 0 1-14 0v-1"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+                <span id="mic-text">Mikrofon ausschalten</span>
+            </button>
             <button id="leave-btn" class="btn-leave">Verlassen</button>
         </div>
     </div>
@@ -249,7 +272,6 @@
         let peers = {};
         let discoveryInterval = null;
 
-        // Generiere Verifizierungscode beim Laden
         const generatedCode = 'HUB-' + Math.floor(1000 + Math.random() * 9000);
         document.getElementById('verify-code').innerText = generatedCode;
 
@@ -259,9 +281,10 @@
         const errorText = document.getElementById('error-text');
         const participantsList = document.getElementById('participants-list');
         const toggleMicBtn = document.getElementById('toggle-mic-btn');
+        const micIcon = document.getElementById('mic-icon');
+        const micText = document.getElementById('mic-text');
         const leaveBtn = document.getElementById('leave-btn');
 
-        // Robustere Proxy-Abfrage
         async function fetchRobloxData(url) {
             const proxies = [
                 'https://api.allorigins.win/raw?url=',
@@ -278,7 +301,6 @@
             return null;
         }
 
-        // Roblox Account & Bio Check
         async function verifyRobloxAccount(username) {
             const searchData = await fetchRobloxData(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(username)}&limit=10`);
             if (!searchData || !searchData.data) return { error: "Verbindungsfehler zur Roblox API." };
@@ -286,13 +308,11 @@
             const user = searchData.data.find(u => u.name.toLowerCase() === username.toLowerCase());
             if (!user) return { error: "Dieser Roblox-Account existiert nicht." };
 
-            // Profil-Details prüfen (ob der Code in der Bio steht)
             const userDetails = await fetchRobloxData(`https://users.roblox.com/v1/users/${user.id}`);
             if (!userDetails || !userDetails.description || !userDetails.description.includes(generatedCode)) {
                 return { error: `Code '${generatedCode}' wurde nicht in deiner Roblox-Bio gefunden!` };
             }
 
-            // Headshot Avatar laden
             const avatarData = await fetchRobloxData(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=150x150&format=Png&isCircular=true`);
             const avatarUrl = (avatarData && avatarData.data && avatarData.data[0]) ? avatarData.data[0].imageUrl : '';
 
@@ -340,7 +360,6 @@
             errorText.style.display = 'block';
         }
 
-        // Synchronisierte P2P Mesh-Verbindung
         function initMeshNetwork(index) {
             if (index > MAX_PEERS) {
                 alert("Raum ist voll.");
@@ -354,8 +373,6 @@
             peer.on('open', (id) => {
                 myIndex = index;
                 addParticipantToUI(myInfo.name, myInfo.avatar, id, true);
-                
-                // Regelmäßiger Broadcast zur Wiederherstellung verloren gegangener Verbindungen
                 discoveryInterval = setInterval(syncPeers, 3000);
             });
 
@@ -366,14 +383,11 @@
                 }
             });
 
-            // Eingehender Daten-Handshake
             peer.on('connection', (conn) => {
                 conn.on('data', (data) => {
                     if (data.type === 'sync') {
                         peers[conn.peer] = { conn, info: data.info };
                         addParticipantToUI(data.info.name, data.info.avatar, conn.peer, false);
-                        
-                        // Zwingender Rück-Handshake für ZWEI-WEGE Sichtbarkeit
                         conn.send({ type: 'sync-ack', info: myInfo });
                     } 
                     else if (data.type === 'sync-ack') {
@@ -436,9 +450,16 @@
             card.appendChild(nameEl);
 
             if (!isMe) {
+                // Lautsprecher Icon-Button anstelle von Text
                 const muteBtn = document.createElement('button');
-                muteBtn.className = 'mute-toggle';
-                muteBtn.innerText = 'Stummschalten';
+                muteBtn.className = 'icon-btn';
+                muteBtn.title = 'Teilnehmer stummschalten';
+                muteBtn.innerHTML = `
+                    <svg class="speaker-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    </svg>
+                `;
                 
                 let isMuted = false;
                 muteBtn.onclick = () => {
@@ -446,8 +467,24 @@
                     if (audioEl) {
                         isMuted = !isMuted;
                         audioEl.muted = isMuted;
-                        muteBtn.innerText = isMuted ? 'Entstummen' : 'Stummschalten';
                         muteBtn.style.backgroundColor = isMuted ? 'var(--error)' : 'var(--container-hover)';
+                        // Ändere das Icon zu Durchgestrichen wenn stummgeschaltet
+                        if (isMuted) {
+                            muteBtn.innerHTML = `
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                    <path d="M9 9v6h3l5 5V4L12 9H9z"></path>
+                                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                                </svg>
+                            `;
+                        } else {
+                            muteBtn.innerHTML = `
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                                </svg>
+                            `;
+                        }
                     }
                 };
                 card.appendChild(muteBtn);
@@ -461,8 +498,16 @@
             if (localStream) {
                 micEnabled = !micEnabled;
                 localStream.getAudioTracks()[0].enabled = micEnabled;
-                toggleMicBtn.innerText = micEnabled ? "Mikrofon ausschalten" : "Mikrofon anschalten";
-                toggleMicBtn.style.backgroundColor = micEnabled ? "var(--accent)" : "var(--error)";
+                
+                if (micEnabled) {
+                    micIcon.innerHTML = `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v1a7 7 0 0 1-14 0v-1"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line>`;
+                    micText.innerText = "Mikrofon ausschalten";
+                    toggleMicBtn.style.backgroundColor = "var(--accent)";
+                } else {
+                    micIcon.innerHTML = `<line x1="1" y1="1" x2="23" y2="23"></line><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.68-1.4"></path><path d="M19 10v1a7 7 0 0 1-12.57 4.38"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line>`;
+                    micText.innerText = "Mikrofon einschalten";
+                    toggleMicBtn.style.backgroundColor = "var(--error)";
+                }
             }
         });
 
