@@ -236,7 +236,7 @@
         
         <div class="input-group">
             <label for="roblox-name">Roblox Benutzername</label>
-            <input type="text" id="roblox-name" placeholder="z. B. 1Bananiel1616" autocomplete="off">
+            <input type="text" id="roblox-name" placeholder="Dein Roblox Name" autocomplete="off">
         </div>
 
         <div id="verify-container">
@@ -325,7 +325,6 @@
 
         checkSavedUser();
 
-        // Optimierte Proxy-Reihenfolge für schnelleres Laden
         async function fetchRobloxData(url) {
             const proxies = [
                 'https://corsproxy.io/?',
@@ -349,8 +348,8 @@
             const user = searchData.data.find(u => u.name.toLowerCase() === username.toLowerCase());
             if (!user) return { error: "Dieser Roblox-Account existiert nicht." };
 
-            const userDetails = await fetchRobloxData(`https://users.roblox.com/v1/users/${user.id}`);
-            // Prüft, ob der Code irgendwo (z.B. neben Hallo) in der gesamten Bio enthalten ist
+            // Cache-Busting (?_timestamp) angehängt, damit die aktuelle Bio sofort ohne Verzögerung erkannt wird
+            const userDetails = await fetchRobloxData(`https://users.roblox.com/v1/users/${user.id}?_=${Date.now()}`);
             if (!userDetails || !userDetails.description || !userDetails.description.includes(generatedCode)) {
                 return { error: `Code '${generatedCode}' wurde nicht in deiner Roblox-Bio gefunden!` };
             }
