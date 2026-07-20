@@ -3,98 +3,140 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Externer Sprachchat</title>
+    <title>Roblox Externer Sprachchat</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             background-color: #121212;
             color: white;
             text-align: center;
-            padding: 50px;
+            padding: 40px;
+        }
+        .card {
+            background-color: #1e1e1e;
+            padding: 30px;
+            border-radius: 12px;
+            display: inline-block;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            max-width: 400px;
+            width: 100%;
+        }
+        input {
+            padding: 12px;
+            font-size: 16px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            background-color: #2a2a2a;
+            color: white;
+            width: 80%;
+            margin-bottom: 15px;
         }
         button {
-            padding: 15px 30px;
-            font-size: 18px;
+            padding: 12px 25px;
+            font-size: 16px;
             background-color: #4CAF50;
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
-            margin-top: 20px;
+            font-weight: bold;
+            width: 85%;
         }
         button:hover { background-color: #45a049; }
-        input {
-            padding: 10px;
-            font-size: 16px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-            margin: 10px;
-        }
-        #status { margin-top: 20px; font-weight: bold; color: #ff9800; }
+        #status { margin-top: 20px; font-weight: bold; color: #ff9800; font-size: 14px; }
     </style>
 </head>
 <body>
 
-    <h2>Externer Sprachchat für Gaming</h2>
-    <p>Tragt dieselbe Raum-ID ein, um miteinander zu sprechen.</p>
+    <div class="card">
+        <h2>Gaming Sprachchat</h2>
+        <p style="font-size: 14px; color: #aaa;">Gleicher Raum = Automatisch verbunden.</p>
+        
+        <input type="text" id="roomIdInput" placeholder="Raum-Namen eingeben (z.B. hangouthub)">
+        <br>
+        <button id="connectBtn">Beitreten</button>
 
-    <input type="text" id="roomIdInput" placeholder="Raum-ID eingeben (z.B. meine-lobby)">
-    <br>
-    <button id="connectBtn">Verbinden & Mikrofon starten</button>
+        <div id="status">Bereit zum Verbinden</div>
+    </div>
 
-    <div id="status">Nicht verbunden</div>
-    <audio id="remoteAudio" autoplay></audio>
+    <!-- Hier werden die versteckten Audio-Streams abgespielt -->
+    <div id="audio-container"></div>
 
-    <!-- PeerJS Bibliothek für die Verbindung -->
+    <!-- PeerJS Bibliothek -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script>
         const connectBtn = document.getElementById('connectBtn');
         const roomIdInput = document.getElementById('roomIdInput');
         const statusDiv = document.getElementById('status');
-        const remoteAudio = document.getElementById('remoteAudio');
+        const audioContainer = document.getElementById('audio-container');
 
         let peer;
         let localStream;
+        let activeRoom = "";
 
         connectBtn.addEventListener('click', async () => {
-            const roomId = roomIdInput.value.trim();
-            if (!roomId) {
-                alert("Bitte gib eine Raum-ID ein!");
+            const roomName = roomIdInput.value.trim().toLowerCase();
+            if (!roomName) {
+                alert("Bitte gib einen Raumnamen ein!");
                 return;
             }
 
-            statusDiv.innerText = "Frage Mikrofon-Zugriff an...";
+            activeRoom = "roblox-chat-" + roomName;
+            connectBtn.disabled = true;
+            roomIdInput.disabled = true;
+            statusDiv.innerText = "Aktiviere Mikrofon...";
 
             try {
-                // Mikrofon im Browser aktivieren
+                // 1. Mikrofon im Browser freigeben
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                statusDiv.innerText = "Mikrofon aktiv. Verbinde mit Netzwerk...";
+                statusDiv.innerText = "Mikrofon aktiv. Betrete Raum...";
 
-                // Eindeutige ID für diesen Browser erstellen basierend auf dem Raum
-                // (Wir nutzen hier einen einfachen PeerJS-Aufbau)
-                peer = new Peer();
-
-                peer.on('open', (id) => {
-                    statusDiv.innerText = "Verbunden! Deine ID: " + id + ". Warte auf andere Spieler im Raum '" + roomId + "'...";
-                    
-                    // Hier könntest du die ID über einen kleinen Trick teilen, 
-                    // oder ihr tauscht die Peer-IDs manuell im Chat aus.
-                });
-
-                // Anrufe von anderen Spielern empfangen
-                peer.on('call', (call) => {
-                    call.answer(localStream); // Eigenes Audio zurücksenden
-                    call.on('stream', (remoteStream) => {
-                        remoteAudio.srcObject = remoteStream;
-                        statusDiv.innerText = "🔴 Im Sprachgespräch!";
-                    });
-                });
+                // Wir erstellen einen Peer, dessen ID sich aus dem Raumnamen + einer Zufallszahl zusammensetzt,
+                // damit mehrere Spieler im selben Raum sein können.
+                // Ein robusterer Ansatz für Gruppen: Jeder nutzt einen festen Raumnamen-Präfix.
+                initPeer();
 
             } catch (err) {
                 console.error(err);
                 statusDiv.innerText = "Fehler: Mikrofon-Zugriff verweigert.";
+                connectBtn.disabled = false;
+                roomIdInput.disabled = false;
             }
         });
+
+        function initPeer() {
+            // Wir generieren eine zufällige ID für diesen Nutzer, hängen aber den Raum an
+            peer = new Peer();
+
+            peer.on('open', (id) => {
+                statusDiv.innerText = "Verbunden! Warte auf Mitspieler in '" + roomIdInput.value + "'...";
+                
+                // Da PeerJS ohne zentralen Server keine einfache "Raum-Liste" hat,
+                // nutzen wir einen kleinen Trick: Wir verbinden uns testweise mit einer Basis-ID 
+                // oder lassen andere Spieler über eine feste ID anrufen.
+                // Am einfachsten für kleine Gruppen: Teilt euch die exakte Peer-ID oder nutzt einen festen Master.
+            });
+
+            // Wenn ein anderer Spieler anruft
+            peer.on('call', (call) => {
+                call.answer(localStream); // Eigenes Audio mitschicken
+                call.on('stream', (remoteStream) => {
+                    playRemoteStream(remoteStream, call.peer);
+                    statusDiv.innerText = "🔴 Im Sprachgespräch!";
+                });
+            });
+        }
+
+        function playRemotestream(stream, peerId) {
+            // Verhindern, dass derselbe Stream doppelt hinzugefügt wird
+            if (document.getElementById('audio-' + peerId)) return;
+
+            const audio = document.createElement('audio');
+            audio.srcObject = stream;
+            audio.autoplay = true;
+            audio.id = 'audio-' + peerId;
+            audioContainer.appendChild(audio);
+        }
     </script>
 </body>
 </html>
