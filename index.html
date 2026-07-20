@@ -242,9 +242,9 @@
         <div id="verify-container">
             <div class="verify-box">
                 <strong>Eigentums-Nachweis:</strong>
-                <div>Schreibe diesen Code kurz in deine Roblox-Bio ("Über mich"):</div>
+                <div>Schreibe diesen Code irgendwo in deine Roblox-Bio ("Über mich"), z.B. neben ein "Hallo":</div>
                 <div id="verify-code" class="code-display">HUB-----</div>
-                <small style="color: var(--text-muted)">Nach dem Beitreten kannst du ihn wieder entfernen.</small>
+                <small style="color: var(--text-muted)">Nach dem Verbinden kannst du ihn wieder löschen.</small>
             </div>
         </div>
 
@@ -291,7 +291,6 @@
 
         const generatedCode = 'HUB-' + Math.floor(1000 + Math.random() * 9000);
 
-        // Prüfen, ob der Nutzer bereits eingeloggt ist (localStorage)
         function checkSavedUser() {
             const savedUser = localStorage.getItem('hangout_hub_user');
             if (savedUser) {
@@ -301,7 +300,6 @@
                     robloxInput.disabled = true;
                     joinBtn.innerText = "Verbinden";
 
-                    // Zeige eingeloggten Status statt des Bio-Codes
                     verifyContainer.innerHTML = `
                         <div class="verify-box" style="border-left-color: var(--success); display: flex; align-items: center; gap: 12px; text-align: left;">
                             <img src="${myInfo.avatar}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
@@ -327,10 +325,11 @@
 
         checkSavedUser();
 
+        // Optimierte Proxy-Reihenfolge für schnelleres Laden
         async function fetchRobloxData(url) {
             const proxies = [
-                'https://api.allorigins.win/raw?url=',
-                'https://corsproxy.io/?'
+                'https://corsproxy.io/?',
+                'https://api.allorigins.win/raw?url='
             ];
             for (let proxy of proxies) {
                 try {
@@ -351,6 +350,7 @@
             if (!user) return { error: "Dieser Roblox-Account existiert nicht." };
 
             const userDetails = await fetchRobloxData(`https://users.roblox.com/v1/users/${user.id}`);
+            // Prüft, ob der Code irgendwo (z.B. neben Hallo) in der gesamten Bio enthalten ist
             if (!userDetails || !userDetails.description || !userDetails.description.includes(generatedCode)) {
                 return { error: `Code '${generatedCode}' wurde nicht in deiner Roblox-Bio gefunden!` };
             }
@@ -384,7 +384,6 @@
                 }
 
                 myInfo = { name: verification.name, avatar: verification.avatar };
-                // Im LocalStorage speichern, damit man beim nächsten Mal eingeloggt bleibt
                 localStorage.setItem('hangout_hub_user', JSON.stringify(myInfo));
             }
 
