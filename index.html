@@ -27,7 +27,7 @@
         h2 { color: #f2f3f5; margin-top: 0; text-align: center; }
         .input-group { margin-bottom: 15px; }
         label { display: block; font-size: 12px; font-weight: bold; color: #949ba4; margin-bottom: 6px; text-transform: uppercase; }
-        input {
+        input[type="text"] {
             width: 100%;
             padding: 10px;
             font-size: 14px;
@@ -38,6 +38,35 @@
             box-sizing: border-box;
         }
         input:focus { outline: 1px solid #5865f2; }
+        
+        /* Profilbild Upload Styling */
+        .avatar-upload {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .avatar-preview {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background-color: #5865f2;
+            margin: 0 auto 10px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 20px;
+            overflow: hidden;
+            border: 2px solid #4752c4;
+            cursor: pointer;
+        }
+        .avatar-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        input[type="file"] { display: none; }
+
         button {
             width: 100%;
             padding: 12px;
@@ -51,6 +80,7 @@
             margin-top: 10px;
         }
         button:hover { background-color: #4752c4; }
+        
         #call-screen { display: none; }
         .user-list {
             background-color: #1e1f22;
@@ -64,12 +94,17 @@
         .user-item {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             padding: 8px;
             margin-bottom: 5px;
             background-color: #2b2d31;
             border-radius: 4px;
         }
-        .avatar {
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+        .avatar-small {
             width: 32px;
             height: 32px;
             border-radius: 50%;
@@ -80,115 +115,134 @@
             font-weight: bold;
             color: white;
             margin-right: 10px;
-            font-size: 14px;
+            font-size: 12px;
+            overflow: hidden;
         }
+        .avatar-small img { width: 100%; height: 100%; object-fit: cover; }
+        
         .controls {
             display: flex;
             gap: 10px;
             margin-top: 20px;
         }
+        .btn-secondary { background-color: #4e5058; }
+        .btn-secondary:hover { background-color: #6d6f78; }
         .btn-danger { background-color: #da373c; }
         .btn-danger:hover { background-color: #a1282c; }
+        .mute-btn {
+            background: none;
+            border: none;
+            color: #949ba4;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px 8px;
+            width: auto;
+            margin: 0;
+        }
+        .mute-btn:hover { color: white; background: none; }
     </style>
 </head>
 <body>
 
     <!-- LOBBY SCREEN -->
     <div class="container" id="lobby-screen">
-        <h2>Sprachkanal beitreten</h2>
+        <h2>Sprachkanal</h2>
         
+        <div class="avatar-upload">
+            <label for="avatarInput">
+                <div class="avatar-preview" id="avatarPreview">JD</div>
+            </label>
+            <input type="file" id="avatarInput" accept="image/*">
+            <span style="font-size: 11px; color: #949ba4;">Klicken, um Profilbild zu wählen</span>
+        </div>
+
         <div class="input-group">
             <label>Dein Name</label>
             <input type="text" id="usernameInput" placeholder="z. B. 1Bananiel1616">
         </div>
 
-        <div class="input-group">
-            <label>Raum-Name</label>
-            <input type="text" id="roomInput" placeholder="z. B. hangouthub">
-        </div>
-
-        <button id="joinBtn">Verbinden</button>
+        <button id="joinBtn">Beitreten</button>
     </div>
 
-    <!-- CALL SCREEN (Discord Style) -->
+    <!-- CALL SCREEN -->
     <div class="container" id="call-screen">
-        <h2 id="roomTitle">Kanal</h2>
-        <label>Aktive Teilnehmer</label>
+        <h2>Haupt-Kanal</h2>
+        <label>Teilnehmer</label>
         
         <div class="user-list" id="userList">
-            <!-- Teilnehmer werden hier angezeigt -->
+            <!-- Teilnehmerliste -->
         </div>
 
         <div class="controls">
+            <button id="muteSelfBtn" class="btn-secondary">Mikro aus</button>
             <button id="leaveBtn" class="btn-danger">Verlassen</button>
         </div>
     </div>
 
-    <!-- Audio-Container für Sprachwiedergabe -->
     <div id="audio-container" style="display:none;"></div>
 
-    <!-- PeerJS Bibliothek -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script>
         const lobbyScreen = document.getElementById('lobby-screen');
         const callScreen = document.getElementById('call-screen');
         const joinBtn = document.getElementById('joinBtn');
         const leaveBtn = document.getElementById('leaveBtn');
+        const muteSelfBtn = document.getElementById('muteSelfBtn');
         const usernameInput = document.getElementById('usernameInput');
-        const roomInput = document.getElementById('roomInput');
-        const roomTitle = document.getElementById('roomTitle');
+        const avatarInput = document.getElementById('avatarInput');
+        const avatarPreview = document.getElementById('avatarPreview');
         const userList = document.getElementById('userList');
         const audioContainer = document.getElementById('audio-container');
 
         let peer;
         let localStream;
         let myName = "";
-        let currentRoom = "";
+        let myAvatarUrl = "";
+        let isMuted = false;
+
+        // Profilbild Auswahl verarbeiten
+        avatarInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    myAvatarUrl = event.target.result;
+                    avatarPreview.innerHTML = `<img src="${myAvatarUrl}">`;
+                }
+                reader.readAsDataURL(file);
+            }
+        });
 
         joinBtn.addEventListener('click', async () => {
             myName = usernameInput.value.trim();
-            currentRoom = roomInput.value.trim().toLowerCase();
-
-            if (!myName || !currentRoom) {
-                alert("Bitte gib deinen Namen und einen Raum ein!");
+            if (!myName) {
+                alert("Bitte gib einen Namen ein!");
                 return;
             }
 
             try {
-                // Mikrofon im Browser aktivieren
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
 
-                // UI umschalten
                 lobbyScreen.style.display = 'none';
                 callScreen.style.display = 'block';
-                roomTitle.innerText = "Kanal: " + currentRoom;
 
-                // Eher eigene UI-Karte hinzufügen
-                addUserToList(myName, "Du");
-
-                // PeerJS starten mit einem Präfix für den Raum
-                // (Damit sich Spieler im selben Raum finden, nutzen wir eine öffentliche PeerJS Cloud mit Raumnamen-ID)
+                addUserToList(myName, myAvatarUrl, "local", true);
                 initPeerConnection();
 
             } catch (err) {
                 console.error(err);
-                alert("Mikrofon-Zugriff verweigert oder Fehler aufgetreten!");
+                alert("Mikrofon-Zugriff verweigert!");
             }
         });
 
         function initPeerConnection() {
-            // Wir erstellen eine eindeutige Peer-ID basierend auf Raum und Namen
-            const uniqueId = "roblox-vc-" + currentRoom + "-" + Math.random().toString(36).substring(2, 7);
-            peer = new Peer(uniqueId);
+            // Alle nutzen denselben festen Basis-Raum "roblox-global-hauptkanal"
+            peer = new Peer();
 
             peer.on('open', (id) => {
-                console.log("Verbunden mit Peer-ID: " + id);
-                // Da PeerJS ohne zentrales Backend keine automatische Raumliste hat,
-                // verbindet sich jeder neue Peer. (Für einen echten Server bräuchte man Node.js, 
-                // aber im Browser teilt man sich kurz den Link/Raum).
+                console.log("Eigene ID: " + id);
             });
 
-            // Wenn jemand anruft
             peer.on('call', (call) => {
                 call.answer(localStream);
                 call.on('stream', (remoteStream) => {
@@ -197,18 +251,26 @@
             });
         }
 
-        function addUserToList(name, id) {
+        function addUserToList(name, avatarUrl, id, isMe = false) {
             if (document.getElementById('user-' + id)) return;
             
             const div = document.createElement('div');
             div.className = 'user-item';
             div.id = 'user-' + id;
             
-            const initials = name.substring(0, 2).toUpperCase();
+            const avatarContent = avatarUrl ? `<img src="${avatarUrl}">` : name.substring(0, 2).toUpperCase();
             
+            let muteButtonHtml = "";
+            if (!isMe) {
+                muteButtonHtml = `<button class="mute-btn" onclick="toggleRemoteMute('${id}')" id="mute-icon-${id}">🔊</button>`;
+            }
+
             div.innerHTML = `
-                <div class="avatar">${initials}</div>
-                <div><strong>${name}</strong></div>
+                <div class="user-info">
+                    <div class="avatar-small">${avatarContent}</div>
+                    <div><strong>${name}</strong> ${isMe ? '(Du)' : ''}</div>
+                </div>
+                ${muteButtonHtml}
             `;
             userList.appendChild(div);
         }
@@ -222,18 +284,43 @@
             audio.id = 'audio-' + peerId;
             audioContainer.appendChild(audio);
 
-            // Simulierten Namen aus der Peer-ID extrahieren für die Liste
-            addUserToList("Mitspieler", peerId);
+            addUserToList("Mitspieler", "", peerId, false);
+        }
+
+        // Eigenes Mikrofon stummschalten
+        muteSelfBtn.addEventListener('click', () => {
+            if (!localStream) return;
+            isMuted = !isMuted;
+            localStream.getAudioTracks()[0].enabled = !isMuted;
+            
+            if (isMuted) {
+                muteSelfBtn.innerText = "Mikro an";
+                muteSelfBtn.style.backgroundColor = "#da373c";
+            } else {
+                muteSelfBtn.innerText = "Mikro aus";
+                muteSelfBtn.style.backgroundColor = "#4e5058";
+            }
+        });
+
+        // Anderen Teilnehmer stummschalten (nur für dich hörbar)
+        window.toggleRemoteMute = function(peerId) {
+            const audioElem = document.getElementById('audio-' + peerId);
+            const muteIcon = document.getElementById('mute-icon-' + peerId);
+            
+            if (audioElem) {
+                audioElem.muted = !audioElem.muted;
+                if (audioElem.muted) {
+                    muteIcon.innerText = "🔇";
+                } else {
+                    muteIcon.innerText = "🔊";
+                }
+            }
         }
 
         leaveBtn.addEventListener('click', () => {
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-            }
-            if (peer) {
-                peer.destroy();
-            }
-            location.reload(); // Seite neu laden, um den Raum komplett zu verlassen
+            if (localStream) localStream.getTracks().forEach(track => track.stop());
+            if (peer) peer.destroy();
+            location.reload();
         });
     </script>
 </body>
