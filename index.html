@@ -348,7 +348,6 @@
             const user = searchData.data.find(u => u.name.toLowerCase() === username.toLowerCase());
             if (!user) return { error: "Dieser Roblox-Account existiert nicht." };
 
-            // Cache-Busting (?_timestamp) angehängt, damit die aktuelle Bio sofort ohne Verzögerung erkannt wird
             const userDetails = await fetchRobloxData(`https://users.roblox.com/v1/users/${user.id}?_=${Date.now()}`);
             if (!userDetails || !userDetails.description || !userDetails.description.includes(generatedCode)) {
                 return { error: `Code '${generatedCode}' wurde nicht in deiner Roblox-Bio gefunden!` };
@@ -414,7 +413,16 @@
             }
 
             const myId = `hghub-${GLOBAL_ROOM}-${index}`;
-            peer = new Peer(myId);
+            
+            // STUN-Server hinzugefügt, damit Verbindungen im Mobilfunknetz (NAT) klappen
+            peer = new Peer(myId, {
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                }
+            });
 
             peer.on('open', (id) => {
                 myIndex = index;
