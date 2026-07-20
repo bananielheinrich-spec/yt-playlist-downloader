@@ -87,6 +87,11 @@
             outline: 2px solid var(--accent);
         }
 
+        input:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
         .verify-box {
             background: #1e1f22;
             padding: 12px;
@@ -196,7 +201,6 @@
             text-align: center;
         }
 
-        /* Icon-Button für lokales Muten in der Karte */
         .icon-btn {
             margin-top: 10px;
             background-color: var(--container-hover);
@@ -235,11 +239,13 @@
             <input type="text" id="roblox-name" placeholder="z. B. 1Bananiel1616" autocomplete="off">
         </div>
 
-        <div class="verify-box">
-            <strong>Eigentums-Nachweis:</strong>
-            <div>Schreibe diesen Code kurz in deine Roblox-Bio ("Über mich"):</div>
-            <div id="verify-code" class="code-display">HUB-----</div>
-            <small style="color: var(--text-muted)">Nach dem Beitreten kannst du ihn wieder entfernen.</small>
+        <div id="verify-container">
+            <div class="verify-box">
+                <strong>Eigentums-Nachweis:</strong>
+                <div>Schreibe diesen Code kurz in deine Roblox-Bio ("Über mich"):</div>
+                <div id="verify-code" class="code-display">HUB-----</div>
+                <small style="color: var(--text-muted)">Nach dem Beitreten kannst du ihn wieder entfernen.</small>
+            </div>
         </div>
 
         <button id="join-btn">Beitreten</button>
@@ -254,7 +260,6 @@
 
         <div class="controls">
             <button id="toggle-mic-btn">
-                <!-- Mikrofon Icon (An) -->
                 <svg id="mic-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v1a7 7 0 0 1-14 0v-1"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
                 <span id="mic-text">Mikrofon ausschalten</span>
             </button>
@@ -272,9 +277,6 @@
         let peers = {};
         let discoveryInterval = null;
 
-        const generatedCode = 'HUB-' + Math.floor(1000 + Math.random() * 9000);
-        document.getElementById('verify-code').innerText = generatedCode;
-
         const lobbyScreen = document.getElementById('lobby-screen');
         const chatScreen = document.getElementById('chat-screen');
         const joinBtn = document.getElementById('join-btn');
@@ -284,6 +286,46 @@
         const micIcon = document.getElementById('mic-icon');
         const micText = document.getElementById('mic-text');
         const leaveBtn = document.getElementById('leave-btn');
+        const verifyContainer = document.getElementById('verify-container');
+        const robloxInput = document.getElementById('roblox-name');
+
+        const generatedCode = 'HUB-' + Math.floor(1000 + Math.random() * 9000);
+
+        // Prüfen, ob der Nutzer bereits eingeloggt ist (localStorage)
+        function checkSavedUser() {
+            const savedUser = localStorage.getItem('hangout_hub_user');
+            if (savedUser) {
+                try {
+                    myInfo = JSON.parse(savedUser);
+                    robloxInput.value = myInfo.name;
+                    robloxInput.disabled = true;
+                    joinBtn.innerText = "Verbinden";
+
+                    // Zeige eingeloggten Status statt des Bio-Codes
+                    verifyContainer.innerHTML = `
+                        <div class="verify-box" style="border-left-color: var(--success); display: flex; align-items: center; gap: 12px; text-align: left;">
+                            <img src="${myInfo.avatar}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                            <div style="flex-grow: 1;">
+                                <div style="font-weight: bold; color: #fff;">Eingeloggt als ${myInfo.name}</div>
+                                <a href="#" id="logout-link" style="color: var(--accent); font-size: 12px; text-decoration: underline;">Anderen Account nutzen</a>
+                            </div>
+                        </div>
+                    `;
+
+                    document.getElementById('logout-link').addEventListener('click', (e) => {
+                        e.preventDefault();
+                        localStorage.removeItem('hangout_hub_user');
+                        location.reload();
+                    });
+                } catch (e) {
+                    localStorage.removeItem('hangout_hub_user');
+                }
+            } else {
+                document.getElementById('verify-code').innerText = generatedCode;
+            }
+        }
+
+        checkSavedUser();
 
         async function fetchRobloxData(url) {
             const proxies = [
@@ -320,25 +362,31 @@
         }
 
         joinBtn.addEventListener('click', async () => {
-            const username = document.getElementById('roblox-name').value.trim();
-            if (!username) {
-                showError("Bitte gib deinen Roblox-Namen ein.");
-                return;
+            const savedUser = localStorage.getItem('hangout_hub_user');
+
+            if (!savedUser) {
+                const username = robloxInput.value.trim();
+                if (!username) {
+                    showError("Bitte gib deinen Roblox-Namen ein.");
+                    return;
+                }
+
+                joinBtn.disabled = true;
+                joinBtn.innerText = "Prüfe Roblox Bio...";
+                errorText.style.display = 'none';
+
+                const verification = await verifyRobloxAccount(username);
+                if (verification.error) {
+                    showError(verification.error);
+                    joinBtn.disabled = false;
+                    joinBtn.innerText = "Beitreten";
+                    return;
+                }
+
+                myInfo = { name: verification.name, avatar: verification.avatar };
+                // Im LocalStorage speichern, damit man beim nächsten Mal eingeloggt bleibt
+                localStorage.setItem('hangout_hub_user', JSON.stringify(myInfo));
             }
-
-            joinBtn.disabled = true;
-            joinBtn.innerText = "Prüfe Roblox Bio...";
-            errorText.style.display = 'none';
-
-            const verification = await verifyRobloxAccount(username);
-            if (verification.error) {
-                showError(verification.error);
-                joinBtn.disabled = false;
-                joinBtn.innerText = "Beitreten";
-                return;
-            }
-
-            myInfo = { name: verification.name, avatar: verification.avatar };
 
             try {
                 joinBtn.innerText = "Starte Mikrofon...";
@@ -351,7 +399,7 @@
             } catch (err) {
                 showError("Mikrofon-Zugriff fehlgeschlagen.");
                 joinBtn.disabled = false;
-                joinBtn.innerText = "Beitreten";
+                joinBtn.innerText = savedUser ? "Verbinden" : "Beitreten";
             }
         });
 
@@ -450,7 +498,6 @@
             card.appendChild(nameEl);
 
             if (!isMe) {
-                // Lautsprecher Icon-Button anstelle von Text
                 const muteBtn = document.createElement('button');
                 muteBtn.className = 'icon-btn';
                 muteBtn.title = 'Teilnehmer stummschalten';
@@ -468,7 +515,6 @@
                         isMuted = !isMuted;
                         audioEl.muted = isMuted;
                         muteBtn.style.backgroundColor = isMuted ? 'var(--error)' : 'var(--container-hover)';
-                        // Ändere das Icon zu Durchgestrichen wenn stummgeschaltet
                         if (isMuted) {
                             muteBtn.innerHTML = `
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -515,7 +561,14 @@
             if (peer) peer.destroy();
             if (localStream) localStream.getTracks().forEach(track => track.stop());
             if (discoveryInterval) clearInterval(discoveryInterval);
-            location.reload();
+            
+            participantsList.innerHTML = '';
+            peers = {};
+
+            chatScreen.classList.remove('active');
+            lobbyScreen.classList.add('active');
+            joinBtn.disabled = false;
+            joinBtn.innerText = "Verbinden";
         });
     </script>
 </body>
