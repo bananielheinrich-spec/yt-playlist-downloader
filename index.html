@@ -270,12 +270,12 @@
     <script>
         let localStream = null;
         let peer = null;
-        let myIndex = 0;
-        const MAX_PEERS = 30;
-        const GLOBAL_ROOM = 'global-hub';
+        let isMaster = false;
+        let masterConn = null;
+        let roomClients = {};
+        let activeCalls = {};
+        const MASTER_ID = 'hghub-global-master-v2';
         let myInfo = { name: '', avatar: '' };
-        let peers = {};
-        let discoveryInterval = null;
 
         const lobbyScreen = document.getElementById('lobby-screen');
         const chatScreen = document.getElementById('chat-screen');
@@ -392,7 +392,7 @@
                 lobbyScreen.classList.remove('active');
                 chatScreen.classList.add('active');
 
-                initMeshNetwork(0);
+                initNetworkSystem();
             } catch (err) {
                 showError("Mikrofon-Zugriff fehlgeschlagen.");
                 joinBtn.disabled = false;
@@ -405,84 +405,182 @@
             errorText.style.display = 'block';
         }
 
-        function initMeshNetwork(index) {
-            if (index > MAX_PEERS) {
-                alert("Raum ist voll.");
-                location.reload();
-                return;
-            }
-
-            const myId = `hghub-${GLOBAL_ROOM}-${index}`;
-            
-            // STUN-Server hinzugefügt, damit Verbindungen im Mobilfunknetz (NAT) klappen
-            peer = new Peer(myId, {
-                config: {
-                    iceServers: [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' }
-                    ]
-                }
+        function initNetworkSystem() {
+            const testPeer = new Peer(MASTER_ID, {
+                config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
             });
 
-            peer.on('open', (id) => {
-                myIndex = index;
+            testPeer.on('open', (id) => {
+                peer = testPeer;
+                isMaster = true;
+                roomClients = {};
                 addParticipantToUI(myInfo.name, myInfo.avatar, id, true);
-                discoveryInterval = setInterval(syncPeers, 3000);
+                setupMasterEvents();
             });
 
-            peer.on('error', (err) => {
+            testPeer.on('error', (err) => {
                 if (err.type === 'unavailable-id') {
-                    peer.destroy();
-                    initMeshNetwork(index + 1);
+                    testPeer.destroy();
+                    peer = new Peer({
+                        config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
+                    });
+                    peer.on('open', (id) => {
+                        isMaster = false;
+                        addParticipantToUI(myInfo.name, myInfo.avatar, id, true);
+                        setupClientEvents();
+                    });
+                } else {
+                    showError("Netzwerkfehler: " + err.type);
                 }
             });
+        }
 
+        function setupMasterEvents() {
             peer.on('connection', (conn) => {
                 conn.on('data', (data) => {
-                    if (data.type === 'sync') {
-                        peers[conn.peer] = { conn, info: data.info };
-                        addParticipantToUI(data.info.name, data.info.avatar, conn.peer, false);
-                        conn.send({ type: 'sync-ack', info: myInfo });
-                    } 
-                    else if (data.type === 'sync-ack') {
-                        peers[conn.peer] = { conn, info: data.info };
-                        addParticipantToUI(data.info.name, data.info.avatar, conn.peer, false);
-                        
-                        const remoteIndex = parseInt(conn.peer.split('-').pop());
-                        if (myIndex < remoteIndex) {
-                            peer.call(conn.peer, localStream);
-                        }
+                    if (data.type === 'join') {
+                        roomClients[conn.peer] = { info: data.info, conn: conn };
+                        broadcastRoomList();
                     }
+                });
+
+                conn.on('close', () => {
+                    delete roomClients[conn.peer];
+                    removeParticipantFromUI(conn.peer);
+                    broadcastRoomList();
                 });
             });
 
             peer.on('call', (call) => {
                 call.answer(localStream);
-                call.on('stream', (remoteStream) => {
-                    let audio = document.getElementById(`audio-${call.peer}`);
-                    if (!audio) {
-                        audio = document.createElement('audio');
-                        audio.id = `audio-${call.peer}`;
-                        audio.autoplay = true;
-                        document.body.appendChild(audio);
-                    }
-                    audio.srcObject = remoteStream;
-                });
+                handleIncomingCall(call);
             });
         }
 
-        function syncPeers() {
-            for (let i = 0; i <= MAX_PEERS; i++) {
-                if (i === myIndex) continue;
-                const targetId = `hghub-${GLOBAL_ROOM}-${i}`;
-                
-                if (!peers[targetId] || !peers[targetId].conn || !peers[targetId].conn.open) {
-                    const conn = peer.connect(targetId);
-                    conn.on('open', () => {
-                        conn.send({ type: 'sync', info: myInfo });
-                    });
-                }
+        function broadcastRoomList() {
+            let list = [{ id: peer.id, info: myInfo }];
+            for (let id in roomClients) {
+                list.push({ id: id, info: roomClients[id].info });
             }
+
+            syncCallsWithList(list);
+
+            for (let id in roomClients) {
+                roomClients[id].conn.send({ type: 'room-update', list: list });
+            }
+        }
+
+        function setupClientEvents() {
+            masterConn = peer.connect(MASTER_ID, {
+                config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
+            });
+
+            masterConn.on('open', () => {
+                masterConn.send({ type: 'join', info: myInfo });
+            });
+
+            masterConn.on('data', (data) => {
+                if (data.type === 'room-update') {
+                    syncCallsWithList(data.list);
+                }
+            });
+
+            // Wenn der Master den Raum verlässt, übernimmt automatisch ein anderer Client!
+            masterConn.on('close', () => {
+                handleMasterDisconnection();
+            });
+
+            peer.on('call', (call) => {
+                call.answer(localStream);
+                handleIncomingCall(call);
+            });
+        }
+
+        function handleMasterDisconnection() {
+            // Alte Audio-Streams & UI aufräumen
+            for (let id in activeCalls) {
+                activeCalls[id].close();
+            }
+            activeCalls = {};
+            participantsList.innerHTML = '';
+            
+            // Versuche selbst neuer Master zu werden!
+            if (peer) peer.destroy();
+            initNetworkSystem();
+        }
+
+        function syncCallsWithList(list) {
+            // Entferne Teilnehmer aus der UI, die nicht mehr in der Liste sind
+            const currentIds = list.map(p => p.id);
+            document.querySelectorAll('.participant-card').forEach(card => {
+                const pId = card.id.replace('card-', '');
+                if (pId !== peer.id && !currentIds.includes(pId)) {
+                    removeParticipantFromUI(pId);
+                }
+            });
+
+            list.forEach(p => {
+                if (p.id === peer.id) {
+                    if (!document.getElementById(`card-${peer.id}`)) {
+                        addParticipantToUI(myInfo.name, myInfo.avatar, peer.id, true);
+                    }
+                    return;
+                }
+                addParticipantToUI(p.info.name, p.info.avatar, p.id, false);
+
+                if (!activeCalls[p.id]) {
+                    if (peer.id < p.id) {
+                        const call = peer.call(p.id, localStream, {
+                            config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
+                        });
+                        handleOutgoingCall(call, p.id);
+                    }
+                }
+            });
+        }
+
+        function handleIncomingCall(call) {
+            activeCalls[call.peer] = call;
+            call.on('stream', (remoteStream) => {
+                playAudioStream(call.peer, remoteStream);
+            });
+            call.on('close', () => {
+                removeAudioStream(call.peer);
+                delete activeCalls[call.peer];
+            });
+        }
+
+        function handleOutgoingCall(call, peerId) {
+            activeCalls[peerId] = call;
+            call.on('stream', (remoteStream) => {
+                playAudioStream(peerId, remoteStream);
+            });
+            call.on('close', () => {
+                removeAudioStream(peerId);
+                delete activeCalls[peerId];
+            });
+        }
+
+        function playAudioStream(peerId, stream) {
+            let audio = document.getElementById(`audio-${peerId}`);
+            if (!audio) {
+                audio = document.createElement('audio');
+                audio.id = `audio-${peerId}`;
+                audio.autoplay = true;
+                document.body.appendChild(audio);
+            }
+            audio.srcObject = stream;
+        }
+
+        function removeAudioStream(peerId) {
+            let audio = document.getElementById(`audio-${peerId}`);
+            if (audio) audio.remove();
+        }
+
+        function removeParticipantFromUI(peerId) {
+            let card = document.getElementById(`card-${peerId}`);
+            if (card) card.remove();
+            removeAudioStream(peerId);
         }
 
         function addParticipantToUI(name, avatarUrl, peerId, isMe) {
@@ -566,10 +664,10 @@
         leaveBtn.addEventListener('click', () => {
             if (peer) peer.destroy();
             if (localStream) localStream.getTracks().forEach(track => track.stop());
-            if (discoveryInterval) clearInterval(discoveryInterval);
             
             participantsList.innerHTML = '';
-            peers = {};
+            roomClients = {};
+            activeCalls = {};
 
             chatScreen.classList.remove('active');
             lobbyScreen.classList.add('active');
