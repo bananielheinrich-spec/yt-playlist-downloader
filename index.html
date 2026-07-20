@@ -3,132 +3,217 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Roblox Externer Sprachchat</title>
+    <title>Discord-Style Sprachchat</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #121212;
-            color: white;
-            text-align: center;
-            padding: 40px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #313338;
+            color: #dbdee1;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
         }
-        .card {
-            background-color: #1e1e1e;
+        .container {
+            background-color: #2b2d31;
             padding: 30px;
-            border-radius: 12px;
-            display: inline-block;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            max-width: 400px;
+            border-radius: 8px;
             width: 100%;
+            max-width: 400px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
         }
+        h2 { color: #f2f3f5; margin-top: 0; text-align: center; }
+        .input-group { margin-bottom: 15px; }
+        label { display: block; font-size: 12px; font-weight: bold; color: #949ba4; margin-bottom: 6px; text-transform: uppercase; }
         input {
-            padding: 12px;
-            font-size: 16px;
-            border-radius: 6px;
-            border: 1px solid #444;
-            background-color: #2a2a2a;
-            color: white;
-            width: 80%;
-            margin-bottom: 15px;
+            width: 100%;
+            padding: 10px;
+            font-size: 14px;
+            background-color: #1e1f22;
+            border: none;
+            border-radius: 4px;
+            color: #dbdee1;
+            box-sizing: border-box;
         }
+        input:focus { outline: 1px solid #5865f2; }
         button {
-            padding: 12px 25px;
-            font-size: 16px;
-            background-color: #4CAF50;
+            width: 100%;
+            padding: 12px;
+            font-size: 15px;
+            font-weight: bold;
+            background-color: #5865f2;
             color: white;
             border: none;
-            border-radius: 6px;
+            border-radius: 4px;
             cursor: pointer;
-            font-weight: bold;
-            width: 85%;
+            margin-top: 10px;
         }
-        button:hover { background-color: #45a049; }
-        #status { margin-top: 20px; font-weight: bold; color: #ff9800; font-size: 14px; }
+        button:hover { background-color: #4752c4; }
+        #call-screen { display: none; }
+        .user-list {
+            background-color: #1e1f22;
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 15px;
+            min-height: 120px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .user-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            margin-bottom: 5px;
+            background-color: #2b2d31;
+            border-radius: 4px;
+        }
+        .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: #5865f2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .btn-danger { background-color: #da373c; }
+        .btn-danger:hover { background-color: #a1282c; }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h2>Gaming Sprachchat</h2>
-        <p style="font-size: 14px; color: #aaa;">Gleicher Raum = Automatisch verbunden.</p>
+    <!-- LOBBY SCREEN -->
+    <div class="container" id="lobby-screen">
+        <h2>Sprachkanal beitreten</h2>
         
-        <input type="text" id="roomIdInput" placeholder="Raum-Namen eingeben (z.B. hangouthub)">
-        <br>
-        <button id="connectBtn">Beitreten</button>
+        <div class="input-group">
+            <label>Dein Name</label>
+            <input type="text" id="usernameInput" placeholder="z. B. 1Bananiel1616">
+        </div>
 
-        <div id="status">Bereit zum Verbinden</div>
+        <div class="input-group">
+            <label>Raum-Name</label>
+            <input type="text" id="roomInput" placeholder="z. B. hangouthub">
+        </div>
+
+        <button id="joinBtn">Verbinden</button>
     </div>
 
-    <!-- Hier werden die versteckten Audio-Streams abgespielt -->
-    <div id="audio-container"></div>
+    <!-- CALL SCREEN (Discord Style) -->
+    <div class="container" id="call-screen">
+        <h2 id="roomTitle">Kanal</h2>
+        <label>Aktive Teilnehmer</label>
+        
+        <div class="user-list" id="userList">
+            <!-- Teilnehmer werden hier angezeigt -->
+        </div>
+
+        <div class="controls">
+            <button id="leaveBtn" class="btn-danger">Verlassen</button>
+        </div>
+    </div>
+
+    <!-- Audio-Container für Sprachwiedergabe -->
+    <div id="audio-container" style="display:none;"></div>
 
     <!-- PeerJS Bibliothek -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script>
-        const connectBtn = document.getElementById('connectBtn');
-        const roomIdInput = document.getElementById('roomIdInput');
-        const statusDiv = document.getElementById('status');
+        const lobbyScreen = document.getElementById('lobby-screen');
+        const callScreen = document.getElementById('call-screen');
+        const joinBtn = document.getElementById('joinBtn');
+        const leaveBtn = document.getElementById('leaveBtn');
+        const usernameInput = document.getElementById('usernameInput');
+        const roomInput = document.getElementById('roomInput');
+        const roomTitle = document.getElementById('roomTitle');
+        const userList = document.getElementById('userList');
         const audioContainer = document.getElementById('audio-container');
 
         let peer;
         let localStream;
-        let activeRoom = "";
+        let myName = "";
+        let currentRoom = "";
 
-        connectBtn.addEventListener('click', async () => {
-            const roomName = roomIdInput.value.trim().toLowerCase();
-            if (!roomName) {
-                alert("Bitte gib einen Raumnamen ein!");
+        joinBtn.addEventListener('click', async () => {
+            myName = usernameInput.value.trim();
+            currentRoom = roomInput.value.trim().toLowerCase();
+
+            if (!myName || !currentRoom) {
+                alert("Bitte gib deinen Namen und einen Raum ein!");
                 return;
             }
 
-            activeRoom = "roblox-chat-" + roomName;
-            connectBtn.disabled = true;
-            roomIdInput.disabled = true;
-            statusDiv.innerText = "Aktiviere Mikrofon...";
-
             try {
-                // 1. Mikrofon im Browser freigeben
+                // Mikrofon im Browser aktivieren
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                statusDiv.innerText = "Mikrofon aktiv. Betrete Raum...";
 
-                // Wir erstellen einen Peer, dessen ID sich aus dem Raumnamen + einer Zufallszahl zusammensetzt,
-                // damit mehrere Spieler im selben Raum sein können.
-                // Ein robusterer Ansatz für Gruppen: Jeder nutzt einen festen Raumnamen-Präfix.
-                initPeer();
+                // UI umschalten
+                lobbyScreen.style.display = 'none';
+                callScreen.style.display = 'block';
+                roomTitle.innerText = "Kanal: " + currentRoom;
+
+                // Eher eigene UI-Karte hinzufügen
+                addUserToList(myName, "Du");
+
+                // PeerJS starten mit einem Präfix für den Raum
+                // (Damit sich Spieler im selben Raum finden, nutzen wir eine öffentliche PeerJS Cloud mit Raumnamen-ID)
+                initPeerConnection();
 
             } catch (err) {
                 console.error(err);
-                statusDiv.innerText = "Fehler: Mikrofon-Zugriff verweigert.";
-                connectBtn.disabled = false;
-                roomIdInput.disabled = false;
+                alert("Mikrofon-Zugriff verweigert oder Fehler aufgetreten!");
             }
         });
 
-        function initPeer() {
-            // Wir generieren eine zufällige ID für diesen Nutzer, hängen aber den Raum an
-            peer = new Peer();
+        function initPeerConnection() {
+            // Wir erstellen eine eindeutige Peer-ID basierend auf Raum und Namen
+            const uniqueId = "roblox-vc-" + currentRoom + "-" + Math.random().toString(36).substring(2, 7);
+            peer = new Peer(uniqueId);
 
             peer.on('open', (id) => {
-                statusDiv.innerText = "Verbunden! Warte auf Mitspieler in '" + roomIdInput.value + "'...";
-                
-                // Da PeerJS ohne zentralen Server keine einfache "Raum-Liste" hat,
-                // nutzen wir einen kleinen Trick: Wir verbinden uns testweise mit einer Basis-ID 
-                // oder lassen andere Spieler über eine feste ID anrufen.
-                // Am einfachsten für kleine Gruppen: Teilt euch die exakte Peer-ID oder nutzt einen festen Master.
+                console.log("Verbunden mit Peer-ID: " + id);
+                // Da PeerJS ohne zentrales Backend keine automatische Raumliste hat,
+                // verbindet sich jeder neue Peer. (Für einen echten Server bräuchte man Node.js, 
+                // aber im Browser teilt man sich kurz den Link/Raum).
             });
 
-            // Wenn ein anderer Spieler anruft
+            // Wenn jemand anruft
             peer.on('call', (call) => {
-                call.answer(localStream); // Eigenes Audio mitschicken
+                call.answer(localStream);
                 call.on('stream', (remoteStream) => {
-                    playRemoteStream(remoteStream, call.peer);
-                    statusDiv.innerText = "🔴 Im Sprachgespräch!";
+                    playRemoteAudio(remoteStream, call.peer);
                 });
             });
         }
 
-        function playRemotestream(stream, peerId) {
-            // Verhindern, dass derselbe Stream doppelt hinzugefügt wird
+        function addUserToList(name, id) {
+            if (document.getElementById('user-' + id)) return;
+            
+            const div = document.createElement('div');
+            div.className = 'user-item';
+            div.id = 'user-' + id;
+            
+            const initials = name.substring(0, 2).toUpperCase();
+            
+            div.innerHTML = `
+                <div class="avatar">${initials}</div>
+                <div><strong>${name}</strong></div>
+            `;
+            userList.appendChild(div);
+        }
+
+        function playRemoteAudio(stream, peerId) {
             if (document.getElementById('audio-' + peerId)) return;
 
             const audio = document.createElement('audio');
@@ -136,7 +221,20 @@
             audio.autoplay = true;
             audio.id = 'audio-' + peerId;
             audioContainer.appendChild(audio);
+
+            // Simulierten Namen aus der Peer-ID extrahieren für die Liste
+            addUserToList("Mitspieler", peerId);
         }
+
+        leaveBtn.addEventListener('click', () => {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+            if (peer) {
+                peer.destroy();
+            }
+            location.reload(); // Seite neu laden, um den Raum komplett zu verlassen
+        });
     </script>
 </body>
 </html>
