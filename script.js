@@ -1,5 +1,5 @@
 /** 
- * HANGOUT HUB - Hauptlogik (Gefixter Mute-Status & Ultraschnelles Raum-System)
+ * HANGOUT HUB - Hauptlogik (Mit Echostopp & Mobile Optimierung)
  */
 
 function safeGetStorage(key) {
@@ -139,7 +139,15 @@ async function startVoiceChat() {
     screens.chat.classList.add('active');
     
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        // Echostopp & Rauschunterdrückung für Handys & PCs aktiviert
+        localStream = await navigator.mediaDevices.getUserMedia({ 
+            audio: { 
+                echoCancellation: true, 
+                noiseSuppression: true, 
+                autoGainControl: true 
+            }, 
+            video: false 
+        });
     } catch (err) {
         alert('Mikrofon-Zugriff verweigert!');
         leaveRoom();
