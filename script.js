@@ -1,5 +1,5 @@
 /** 
- * HANGOUT HUB - Hauptlogik (Mit Echostopp & Mobile Optimierung)
+ * BETTER VOICE - Hauptlogik (Mit Echostopp & Mobile Optimierung)
  */
 
 function safeGetStorage(key) {
@@ -14,7 +14,7 @@ function safeRemoveStorage(key) {
     try { localStorage.removeItem(key); } catch (e) {}
 }
 
-const ROOM_ID = 'hangout-hub-duo-room-2026';
+const ROOM_ID = 'better-voice-roblox-room-2026';
 let verificationCode = '';
 let currentUser = null;
 
@@ -48,10 +48,10 @@ const dom = {
 };
 
 function init() {
-    verificationCode = 'HUB-' + Math.floor(1000 + Math.random() * 9000);
+    verificationCode = 'BV-' + Math.floor(1000 + Math.random() * 9000);
     if (dom.verifyCode) dom.verifyCode.innerText = verificationCode;
 
-    const saved = safeGetStorage('hangout_hub_user');
+    const saved = safeGetStorage('better_voice_user');
     if (saved) {
         try {
             currentUser = JSON.parse(saved);
@@ -60,7 +60,7 @@ function init() {
             dom.loginSection.classList.add('hidden');
             dom.savedSection.classList.remove('hidden');
         } catch (e) {
-            safeRemoveStorage('hangout_hub_user');
+            safeRemoveStorage('better_voice_user');
         }
     }
 
@@ -68,7 +68,7 @@ function init() {
     if (dom.btnQuickJoin) dom.btnQuickJoin.addEventListener('click', startVoiceChat);
     if (dom.btnLogout) {
         dom.btnLogout.addEventListener('click', () => {
-            safeRemoveStorage('hangout_hub_user');
+            safeRemoveStorage('better_voice_user');
             currentUser = null;
             dom.savedSection.classList.add('hidden');
             dom.loginSection.classList.remove('hidden');
@@ -119,7 +119,7 @@ async function handleVerification() {
         const avatarUrl = (avatarData && avatarData.data && avatarData.data[0]) ? avatarData.data[0].imageUrl : '';
 
         currentUser = { id: userId, username: profileData.name, avatar: avatarUrl };
-        safeSetStorage('hangout_hub_user', JSON.stringify(currentUser));
+        safeSetStorage('better_voice_user', JSON.stringify(currentUser));
         
         showStatus('Erfolgreich!', 'success');
         setTimeout(() => startVoiceChat(), 500);
@@ -139,7 +139,6 @@ async function startVoiceChat() {
     screens.chat.classList.add('active');
     
     try {
-        // Echostopp & Rauschunterdrückung für Handys & PCs aktiviert
         localStream = await navigator.mediaDevices.getUserMedia({ 
             audio: { 
                 echoCancellation: true, 
