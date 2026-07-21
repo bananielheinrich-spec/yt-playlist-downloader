@@ -1,7 +1,33 @@
 /** 
  * HANGOUT HUB - Hauptlogik (Vollständig & Korrigiert)
- * Senior Frontend & WebRTC Implementation
+ * Inklusive Proxy-Fallback & Safe-Storage für Tracking-Blocker
  */
+
+// --- HILFSFUNKTIONEN FÜR STORAGE (Tracking-Schutz) ---
+function safeGetStorage(key) {
+    try {
+        return localStorage.getItem(key);
+    } catch (e) {
+        console.warn("Lese-Zugriff auf localStorage vom Browser blockiert.");
+        return null;
+    }
+}
+
+function safeSetStorage(key, value) {
+    try {
+        localStorage.setItem(key, value);
+    } catch (e) {
+        console.warn("Schreib-Zugriff auf localStorage vom Browser blockiert.");
+    }
+}
+
+function safeRemoveStorage(key) {
+    try {
+        localStorage.removeItem(key);
+    } catch (e) {
+        console.warn("Lösch-Zugriff auf localStorage vom Browser blockiert.");
+    }
+}
 
 // Konstanten & State
 const MASTER_ID = 'hghub-global-master-v3';
@@ -15,8 +41,8 @@ let localStream = null;
 let isHost = false;
 let masterConnection = null;
 
-const activePeers = {}; // Speichert direkte PeerJS Verbindungen (Audio)
-const peerData = {};    // Speichert Profil-Daten (Roblox Name, Avatar)
+const activePeers = {}; 
+const peerData = {};    
 
 // DOM Elements
 const screens = {
@@ -44,12 +70,11 @@ const dom = {
 // --- 1. INITIALISIERUNG & LOBBY ---
 
 function init() {
-    // Code generieren
     verificationCode = 'HUB-' + Math.floor(1000 + Math.random() * 9000);
     if (dom.verifyCode) dom.verifyCode.innerText = verificationCode;
 
-    // Check LocalStorage
-    const saved = localStorage.getItem('hangout_hub_user');
+    // Check LocalStorage mit der neuen Safe-Funktion
+    const saved = safeGetStorage('hangout_hub_user');
     if (saved) {
         try {
             currentUser = JSON.parse(saved);
@@ -58,7 +83,7 @@ function init() {
             dom.loginSection.classList.add('hidden');
             dom.savedSection.classList.remove('hidden');
         } catch (e) {
-            localStorage.removeItem('hangout_hub_user');
+            safeRemoveStorage('hangout_hub_user');
         }
     }
 
@@ -67,7 +92,7 @@ function init() {
     if (dom.btnQuickJoin) dom.btnQuickJoin.addEventListener('click', startVoiceChat);
     if (dom.btnLogout) {
         dom.btnLogout.addEventListener('click', () => {
-            localStorage.removeItem('hangout_hub_user');
+            safeRemoveStorage('hangout_hub_user');
             currentUser = null;
             dom.savedSection.classList.add('hidden');
             dom.loginSection.classList.remove('hidden');
@@ -80,13 +105,9 @@ function init() {
 // --- 2. ROBLOX VERIFIZIERUNG (mit Multi-Proxy Fallback) ---
 
 async function fetchViaProxy(url) {
-    // Liste von Proxies – schlägt einer wegen CORS/Rate-Limit fehl, greift sofort der nächste
     const proxies = [
-        // 1. RoProxy (Spezialisiert auf Roblox APIs)
         url.replace('roblox.com', 'roproxy.com'),
-        // 2. Corsproxy.io
         `https://corsproxy.io/?${encodeURIComponent(url)}`,
-        // 3. Allorigins.win (im Raw-Modus)
         `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
     ];
 
@@ -101,7 +122,7 @@ async function fetchViaProxy(url) {
         }
     }
 
-    throw new Error('Verbindung zu Roblox fehlgeschlagen. Bitte versuche es erneut.');
+    throw new Error('Verbindung zu Roblox fehlgeschlagen. Bitte versuche es in einem Moment erneut.');
 }
 
 async function handleVerification() {
@@ -112,7 +133,6 @@ async function handleVerification() {
     dom.btnVerify.disabled = true;
 
     try {
-        // 1. User-ID abfragen
         const searchData = await fetchViaProxy(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(username)}&limit=10`);
         
         if (!searchData || !searchData.data || searchData.data.length === 0) {
@@ -126,7 +146,6 @@ async function handleVerification() {
 
         const userId = userMatch.id;
 
-        // 2. Profil-Bio abfragen
         showStatus('Prüfe Bio...', '');
         const profileData = await fetchViaProxy(`https://users.roblox.com/v1/users/${userId}`);
         
@@ -134,7 +153,6 @@ async function handleVerification() {
             throw new Error('Code nicht in der Bio gefunden! (Speichern im Profil nicht vergessen)');
         }
 
-        // 3. Avatar Headshot laden
         showStatus('Lade Avatar...', '');
         const avatarData = await fetchViaProxy(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=true`);
         
@@ -142,9 +160,10 @@ async function handleVerification() {
             ? avatarData.data[0].imageUrl 
             : 'https://tr.rbxcdn.com/30day-avatar-headshot';
 
-        // 4. Speichern & Voice-Chat starten
         currentUser = { id: userId, username: profileData.name, avatar: avatarUrl };
-        localStorage.setItem('hangout_hub_user', JSON.stringify(currentUser));
+        
+        // Speichern mit Safe-Funktion
+        safeSetStorage('hangout_hub_user', JSON.stringify(currentUser));
         
         showStatus('Verifizierung erfolgreich!', 'success');
         setTimeout(() => {
@@ -168,7 +187,6 @@ async function startVoiceChat() {
     screens.lobby.classList.remove('active');
     screens.chat.classList.add('active');
     
-    // Eigene Karte im Grid erstellen
     addPeerCard('local', currentUser.username, currentUser.avatar);
 
     try {
@@ -237,13 +255,8 @@ function connectToMaster() {
         }
     });
 
-    masterConnection.on('close', () => {
-        triggerHostFailover();
-    });
-
-    masterConnection.on('error', () => {
-        triggerHostFailover();
-    });
+    masterConnection.on('close', () => triggerHostFailover());
+    masterConnection.on('error', () => triggerHostFailover());
 }
 
 // --- 4. FAILOVER & HOST MANAGEMENT ---
@@ -406,5 +419,4 @@ function leaveRoom() {
     showStatus('', '');
 }
 
-// App starten sobald DOM geladen ist
 document.addEventListener('DOMContentLoaded', init);
