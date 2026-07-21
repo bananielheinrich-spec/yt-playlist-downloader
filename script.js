@@ -1,9 +1,8 @@
 /** 
  * HANGOUT HUB - Hauptlogik (Vollständig & Korrigiert)
- * Inklusive Proxy-Fallback & Safe-Storage für Tracking-Blocker
+ * Inklusive Proxy-Fallback, Safe-Storage & Discord-UI Kacheln
  */
 
-// --- HILFSFUNKTIONEN FÜR STORAGE (Tracking-Schutz) ---
 function safeGetStorage(key) {
     try {
         return localStorage.getItem(key);
@@ -29,12 +28,10 @@ function safeRemoveStorage(key) {
     }
 }
 
-// Konstanten & State
 const MASTER_ID = 'hghub-global-master-v3';
 let verificationCode = '';
 let currentUser = null;
 
-// WebRTC State
 let peer = null;
 let discoveryPeer = null; 
 let localStream = null;
@@ -44,7 +41,6 @@ let masterConnection = null;
 const activePeers = {}; 
 const peerData = {};    
 
-// DOM Elements
 const screens = {
     lobby: document.getElementById('lobby-screen'),
     chat: document.getElementById('chat-screen')
@@ -67,13 +63,10 @@ const dom = {
     btnLeave: document.getElementById('btn-leave')
 };
 
-// --- 1. INITIALISIERUNG & LOBBY ---
-
 function init() {
     verificationCode = 'HUB-' + Math.floor(1000 + Math.random() * 9000);
     if (dom.verifyCode) dom.verifyCode.innerText = verificationCode;
 
-    // Check LocalStorage mit der neuen Safe-Funktion
     const saved = safeGetStorage('hangout_hub_user');
     if (saved) {
         try {
@@ -87,7 +80,6 @@ function init() {
         }
     }
 
-    // Event Listeners
     if (dom.btnVerify) dom.btnVerify.addEventListener('click', handleVerification);
     if (dom.btnQuickJoin) dom.btnQuickJoin.addEventListener('click', startVoiceChat);
     if (dom.btnLogout) {
@@ -101,8 +93,6 @@ function init() {
     if (dom.btnMuteSelf) dom.btnMuteSelf.addEventListener('click', toggleLocalMute);
     if (dom.btnLeave) dom.btnLeave.addEventListener('click', leaveRoom);
 }
-
-// --- 2. ROBLOX VERIFIZIERUNG (mit Multi-Proxy Fallback) ---
 
 async function fetchViaProxy(url) {
     const proxies = [
@@ -161,8 +151,6 @@ async function handleVerification() {
             : 'https://tr.rbxcdn.com/30day-avatar-headshot';
 
         currentUser = { id: userId, username: profileData.name, avatar: avatarUrl };
-        
-        // Speichern mit Safe-Funktion
         safeSetStorage('hangout_hub_user', JSON.stringify(currentUser));
         
         showStatus('Verifizierung erfolgreich!', 'success');
@@ -180,8 +168,6 @@ function showStatus(msg, type) {
     dom.statusMsg.innerText = msg;
     dom.statusMsg.className = 'status-message ' + (type || '');
 }
-
-// --- 3. WEBRTC & PEER LOGIK ---
 
 async function startVoiceChat() {
     screens.lobby.classList.remove('active');
@@ -259,8 +245,6 @@ function connectToMaster() {
     masterConnection.on('error', () => triggerHostFailover());
 }
 
-// --- 4. FAILOVER & HOST MANAGEMENT ---
-
 function triggerHostFailover() {
     dom.connStatus.innerText = 'Wähle neuen Host...';
     dom.connStatus.className = 'badge connecting';
@@ -292,8 +276,6 @@ function triggerHostFailover() {
         });
     }, Math.random() * 2000);
 }
-
-// --- 5. MESH AUDIO & VERBINDUNGEN ---
 
 function connectToPeer(targetId) {
     const conn = peer.connect(targetId);
@@ -333,8 +315,6 @@ function handleAudioCall(call) {
     activePeers[call.peer].call = call;
 }
 
-// --- 6. UI & AUDIO KONTROLLE ---
-
 function addPeerCard(id, name, avatarUrl) {
     if (document.getElementById(`card-${id}`)) return;
 
@@ -344,8 +324,17 @@ function addPeerCard(id, name, avatarUrl) {
 
     card.innerHTML = `
         <img src="${avatarUrl}" class="peer-avatar" alt="${name}">
-        <div class="peer-name">${name}</div>
-        ${id !== 'local' ? `<button class="peer-mute-btn" onclick="togglePeerMute('${id}')"><i class="fa-solid fa-volume-high"></i></button>` : ''}
+        
+        <div class="peer-info">
+            <span class="peer-name">${name}</span>
+            <i class="fa-solid fa-microphone-slash peer-mute-icon"></i>
+        </div>
+        
+        ${id !== 'local' ? `
+            <button class="peer-action-btn" onclick="togglePeerMute('${id}')" title="Stummschalten">
+                <i class="fa-solid fa-volume-high"></i>
+            </button>
+        ` : ''}
     `;
     dom.grid.appendChild(card);
 }
@@ -372,33 +361,37 @@ function toggleLocalMute() {
     audioTrack.enabled = !audioTrack.enabled;
     
     const icon = dom.btnMuteSelf.querySelector('i');
+    const localCard = document.getElementById('card-local');
+
     if (audioTrack.enabled) {
         dom.btnMuteSelf.classList.remove('muted');
-        dom.btnMuteSelf.classList.add('active');
         icon.className = 'fa-solid fa-microphone';
+        if(localCard) localCard.classList.remove('muted');
     } else {
         dom.btnMuteSelf.classList.add('muted');
-        dom.btnMuteSelf.classList.remove('active');
         icon.className = 'fa-solid fa-microphone-slash';
+        if(localCard) localCard.classList.add('muted');
     }
 }
 
 window.togglePeerMute = function(id) {
     const audioEl = document.getElementById(`audio-${id}`);
-    if (!audioEl) return;
+    const btn = document.querySelector(`#card-${id} .peer-action-btn`);
+    const card = document.getElementById(`card-${id}`);
+    
+    if (!audioEl || !btn || !card) return;
     
     audioEl.muted = !audioEl.muted;
-    const btn = document.querySelector(`#card-${id} .peer-mute-btn`);
-    if (!btn) return;
-
     const icon = btn.querySelector('i');
     
     if (audioEl.muted) {
         btn.classList.add('muted');
         icon.className = 'fa-solid fa-volume-xmark';
+        card.classList.add('muted');
     } else {
         btn.classList.remove('muted');
         icon.className = 'fa-solid fa-volume-high';
+        card.classList.remove('muted');
     }
 };
 
