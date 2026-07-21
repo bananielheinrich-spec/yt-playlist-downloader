@@ -180,14 +180,20 @@ button {
     font-size: 20px;
 }
 
-/* --- Chat Screen Styling --- */
+/* --- Chat Screen Styling (DISCORD LOOK) --- */
+#chat-screen {
+    background-color: #1e1f22;
+}
+
 .chat-header {
-    background-color: var(--bg-card);
+    background-color: #2b2d31;
     padding: 15px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid rgba(0,0,0,0.2);
+    border-bottom: 1px solid #1e1f22;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    z-index: 10;
 }
 
 .chat-header h2 {
@@ -211,91 +217,135 @@ button {
     flex: 1;
     padding: 20px;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    grid-auto-rows: minmax(180px, 1fr);
+    gap: 15px;
     overflow-y: auto;
-    align-content: start;
+    align-content: center;
 }
 
 .peer-card {
-    background-color: var(--bg-card);
+    background-color: #111214;
     border-radius: 8px;
-    padding: 15px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
     position: relative;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    border: 2px solid transparent; 
+}
+
+.peer-card.speaking {
+    border-color: #23a559;
 }
 
 .peer-avatar {
     width: 80px;
     height: 80px;
     border-radius: 50%;
-    margin-bottom: 10px;
-    background-color: var(--bg-main);
-    border: 3px solid transparent;
-    transition: border-color 0.1s;
+    background-color: #2b2d31;
+    object-fit: cover;
 }
 
-.peer-card.speaking .peer-avatar {
-    border-color: var(--success);
+.peer-info {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background-color: rgba(0, 0, 0, 0.6);
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .peer-name {
     font-size: 14px;
-    font-weight: bold;
-    text-align: center;
-    word-break: break-all;
+    font-weight: 500;
+    color: #fff;
 }
 
-.peer-mute-btn {
-    margin-top: 10px;
-    background: var(--bg-main);
+.peer-mute-icon {
+    color: #ed4245;
+    font-size: 12px;
+    display: none;
+}
+
+.peer-card.muted .peer-mute-icon {
+    display: inline-block;
+}
+
+.peer-action-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.6);
+    border: none;
+    color: white;
     width: 32px;
     height: 32px;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s, background 0.2s;
 }
-.peer-mute-btn:hover { background: var(--bg-hover); }
-.peer-mute-btn.muted { color: var(--danger); }
 
-/* --- Control Bar --- */
+@media (hover: hover) {
+    .peer-card:hover .peer-action-btn { opacity: 1; }
+}
+@media (hover: none) {
+    .peer-action-btn { opacity: 1; background: rgba(0,0,0,0.4); }
+}
+
+.peer-action-btn:hover {
+    background: #ed4245;
+}
+.peer-action-btn.muted {
+    background: #ed4245;
+    opacity: 1;
+}
+
+/* --- Control Bar (Discord Style) --- */
 .control-bar {
-    background-color: var(--bg-card);
-    padding: 15px;
+    background-color: #2b2d31;
+    padding: 20px;
     display: flex;
     justify-content: center;
-    gap: 20px;
+    gap: 15px;
+    padding-bottom: env(safe-area-inset-bottom, 20px);
 }
 
 .control-btn {
-    width: 50px;
-    height: 50px;
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
     font-size: 20px;
     display: flex;
     justify-content: center;
     align-items: center;
+    background-color: #313338;
+    color: #dbdee1;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
-.control-btn.active {
-    background-color: var(--bg-hover);
-    color: var(--text-main);
+.control-btn:hover {
+    background-color: #404249;
 }
-.control-btn.active:hover { background-color: #404249; }
 
 .control-btn.muted {
-    background-color: var(--danger);
-    color: white;
+    background-color: #fff;
+    color: #111214;
 }
-.control-btn.muted:hover { background-color: var(--danger-hover); }
+.control-btn.muted:hover {
+    background-color: #f2f3f5;
+}
 
 .control-btn.danger {
-    background-color: var(--danger);
+    background-color: #ed4245;
     color: white;
 }
-.control-btn.danger:hover { background-color: var(--danger-hover); }
+.control-btn.danger:hover {
+    background-color: #da373c;
+}
