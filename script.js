@@ -1,5 +1,5 @@
 /** 
- * HANGOUT HUB - Hauptlogik (Inklusive Mute- und Profil-Synchronisation)
+ * HANGOUT HUB - Hauptlogik (Gefixter Mute-Status & Ultraschnelles Raum-System)
  */
 
 function safeGetStorage(key) {
@@ -138,8 +138,6 @@ async function startVoiceChat() {
     screens.lobby.classList.remove('active');
     screens.chat.classList.add('active');
     
-    addPeerCard('local', currentUser.username, currentUser.avatar);
-
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     } catch (err) {
@@ -147,6 +145,15 @@ async function startVoiceChat() {
         leaveRoom();
         return;
     }
+
+    const audioTrack = localStream.getAudioTracks()[0];
+    if (audioTrack) audioTrack.enabled = true;
+
+    addPeerCard('local', currentUser.username, currentUser.avatar, false);
+    
+    dom.btnMuteSelf.classList.remove('muted');
+    const icon = dom.btnMuteSelf.querySelector('i');
+    if (icon) icon.className = 'fa-solid fa-microphone';
 
     initRoomConnection();
 }
@@ -205,23 +212,24 @@ function setupPeerListeners() {
 
 function setupConnection(conn) {
     conn.on('open', () => {
-        // Profil sofort senden
         conn.send({ type: 'profile', profile: currentUser });
         
-        // Aktuellen eigenen Mute-Status direkt mitschicken
         const audioTrack = localStream ? localStream.getAudioTracks()[0] : null;
-        if (audioTrack && !audioTrack.enabled) {
-            conn.send({ type: 'mute-status', muted: true });
-        }
+        const isMuted = audioTrack ? !audioTrack.enabled : false;
+        conn.send({ type: 'mute-status', muted: isMuted });
     });
 
     conn.on('data', (data) => {
         if (data.type === 'profile') {
             peerData[conn.peer] = data.profile;
-            addPeerCard(conn.peer, data.profile.username, data.profile.avatar);
+            addPeerCard(conn.peer, data.profile.username, data.profile.avatar, false);
             
-            // Antworten, damit die Gegenseite unser Profil garantiert auch hat
             conn.send({ type: 'profile', profile: currentUser });
+
+            const audioTrack = localStream ? localStream.getAudioTracks()[0] : null;
+            if (audioTrack) {
+                conn.send({ type: 'mute-status', muted: !audioTrack.enabled });
+            }
 
             if (isHost) {
                 broadcastPeerList(conn.peer);
@@ -229,9 +237,15 @@ function setupConnection(conn) {
         }
         if (data.type === 'mute-status') {
             const card = document.getElementById(`card-${conn.peer}`);
+            const statusIcon = card ? card.querySelector('.peer-status-icon') : null;
             if (card) {
-                if (data.muted) card.classList.add('muted');
-                else card.classList.remove('muted');
+                if (data.muted) {
+                    card.classList.add('muted');
+                    if (statusIcon) statusIcon.className = 'fa-solid fa-microphone-slash peer-status-icon';
+                } else {
+                    card.classList.remove('muted');
+                    if (statusIcon) statusIcon.className = 'fa-solid fa-microphone peer-status-icon';
+                }
             }
         }
         if (data.type === 'peer_list') {
@@ -292,21 +306,21 @@ function handleAudioCall(call) {
     activePeers[call.peer].call = call;
 }
 
-function addPeerCard(id, name, avatarUrl) {
+function addPeerCard(id, name, avatarUrl, isMuted) {
     if (document.getElementById(`card-${id}`)) return;
 
     const card = document.createElement('div');
     card.id = `card-${id}`;
-    card.className = 'peer-card';
+    card.className = 'peer-card' + (isMuted ? ' muted' : '');
 
     card.innerHTML = `
         <img src="${avatarUrl || 'https://tr.rbxcdn.com/30day-avatar-headshot'}" class="peer-avatar" alt="${name || 'Nutzer'}">
         <div class="peer-info">
             <span class="peer-name">${name || 'Nutzer'}</span>
-            <i class="fa-solid fa-microphone-slash peer-mute-icon"></i>
+            <i class="${isMuted ? 'fa-solid fa-microphone-slash' : 'fa-solid fa-microphone'} peer-status-icon"></i>
         </div>
         ${id !== 'local' ? `
-            <button class="peer-action-btn" onclick="togglePeerMute('${id}')" title="Stummschalten">
+            <button class="peer-action-btn" onclick="togglePeerMute('${id}')" title="Lautstärke stummschalten">
                 <i class="fa-solid fa-volume-high"></i>
             </button>
         ` : ''}
@@ -336,18 +350,24 @@ function toggleLocalMute() {
     
     const icon = dom.btnMuteSelf.querySelector('i');
     const localCard = document.getElementById('card-local');
+    const statusIcon = localCard ? localCard.querySelector('.peer-status-icon') : null;
 
     if (!isMuted) {
         dom.btnMuteSelf.classList.remove('muted');
-        icon.className = 'fa-solid fa-microphone';
-        if (localCard) localCard.classList.remove('muted');
+        if (icon) icon.className = 'fa-solid fa-microphone';
+        if (localCard) {
+            localCard.classList.remove('muted');
+            if (statusIcon) statusIcon.className = 'fa-solid fa-microphone peer-status-icon';
+        }
     } else {
         dom.btnMuteSelf.classList.add('muted');
-        icon.className = 'fa-solid fa-microphone-slash';
-        if (localCard) localCard.classList.add('muted');
+        if (icon) icon.className = 'fa-solid fa-microphone-slash';
+        if (localCard) {
+            localCard.classList.add('muted');
+            if (statusIcon) statusIcon.className = 'fa-solid fa-microphone-slash peer-status-icon';
+        }
     }
 
-    // Mute-Status an alle verbundenen Freunde senden
     Object.values(activePeers).forEach(peerObj => {
         if (peerObj.conn && peerObj.conn.open) {
             peerObj.conn.send({ type: 'mute-status', muted: isMuted });
@@ -366,11 +386,11 @@ window.togglePeerMute = function(id) {
     
     if (audioEl.muted) {
         btn.classList.add('muted');
-        icon.className = 'fa-solid fa-volume-xmark';
+        if (icon) icon.className = 'fa-solid fa-volume-xmark';
         card.classList.add('muted');
     } else {
         btn.classList.remove('muted');
-        icon.className = 'fa-solid fa-volume-high';
+        if (icon) icon.className = 'fa-solid fa-volume-high';
         card.classList.remove('muted');
     }
 };
