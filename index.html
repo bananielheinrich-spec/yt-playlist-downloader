@@ -3,27 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hangout Hub - Voice Chat</title>
+    <title>Better Voice - Roblox Voice Chat</title>
     <link rel="stylesheet" href="style.css">
-    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- PeerJS für WebRTC Audio -->
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body>
     <div id="app">
-        <!-- LOBBY SCREEN (Anmeldung) -->
+        <!-- Lobby Screen -->
         <div id="lobby-screen" class="screen active">
             <div class="card">
-                <h1>Hangout Hub</h1>
+                <h1>Better Voice</h1>
                 <p class="subtitle">Roblox Voice Chat</p>
-
-                <!-- Nicht eingeloggt -->
+                
                 <div id="login-section">
                     <div class="verification-box">
-                        <p>1. Kopiere diesen Code:</p>
-                        <div class="code-display" id="verify-code">HUB-XXXX</div>
-                        <p style="font-size: 12px; color: var(--text-muted);">Füge ihn in deine Roblox-Profilbeschreibung ein und klicke auf Verifizieren.</p>
+                        <p style="font-size: 12px; margin-bottom: 4px; color: var(--text-muted);">1. Kopiere diesen Code:</p>
+                        <div class="code-display" id="verify-code">BV-0000</div>
+                        <p style="font-size: 11px; color: var(--text-muted);">Füge ihn in deine Roblox-Profilbeschreibung ein und klicke auf Verifizieren.</p>
                     </div>
 
                     <div class="input-group">
@@ -32,44 +28,37 @@
                     </div>
 
                     <button id="btn-verify" class="btn-primary">Verifizieren & Beitreten</button>
+                    <div id="auth-status" class="status-message"></div>
                 </div>
 
-                <!-- Bereits eingeloggt (Gespeicherter Nutzer) -->
                 <div id="saved-user-section" class="hidden">
                     <img id="saved-avatar" src="" alt="Avatar">
                     <h2 id="saved-username">Nutzer</h2>
-                    <button id="btn-quick-join" class="btn-primary">Dem Raum beitreten</button>
-                    <button id="btn-logout" class="btn-secondary">Anderen Account nutzen</button>
+                    <button id="btn-quick-join" class="btn-primary">Beitreten</button>
+                    <button id="btn-logout" class="btn-secondary">Anderes Konto</button>
                 </div>
-
-                <div id="auth-status" class="status-message"></div>
             </div>
         </div>
 
-        <!-- CHAT SCREEN (Discord Grid Ansicht) -->
+        <!-- Chat Screen -->
         <div id="chat-screen" class="screen">
-            <div class="chat-header">
-                <h2><i class="fa-solid fa-headphones"></i> Hangout Hub</h2>
-                <span id="connection-status" class="badge connecting">Verbinde...</span>
-            </div>
+            <header class="chat-header">
+                <h2><i class="fa-solid fa-microphone-lines" style="color: var(--accent-yellow);"></i> Better Voice</h2>
+                <div id="connection-status" class="badge connecting">Verbindet...</div>
+            </header>
 
-            <!-- Das Gitternetz für dich und deine Freunde -->
             <div id="peers-grid" class="grid-container">
-                <!-- Kacheln werden hier automatisch per JS eingefügt -->
+                <!-- Peer cards will be injected here -->
             </div>
 
-            <!-- Die untere Steuerungsleiste (Discord Style) -->
             <div class="control-bar">
-                <button id="btn-mute-self" class="control-btn" title="Mikrofon stummschalten">
-                    <i class="fa-solid fa-microphone"></i>
-                </button>
-                <button id="btn-leave" class="control-btn danger" title="Raum verlassen">
-                    <i class="fa-solid fa-phone-slash"></i>
-                </button>
+                <button id="btn-mute-self" class="control-btn" title="Stummschalten"><i class="fa-solid fa-microphone"></i></button>
+                <button id="btn-leave" class="control-btn danger" title="Verlassen"><i class="fa-solid fa-phone-slash"></i></button>
             </div>
         </div>
     </div>
 
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
