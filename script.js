@@ -1,42 +1,27 @@
 /** 
- * HANGOUT HUB - Hauptlogik (Vollständig & Korrigiert)
- * Inklusive Proxy-Fallback, Safe-Storage & Discord-UI Kacheln
+ * HANGOUT HUB - Hauptlogik (Stabiles Raum-System)
  */
 
 function safeGetStorage(key) {
-    try {
-        return localStorage.getItem(key);
-    } catch (e) {
-        console.warn("Lese-Zugriff auf localStorage vom Browser blockiert.");
-        return null;
-    }
+    try { return localStorage.getItem(key); } catch (e) { return null; }
 }
 
 function safeSetStorage(key, value) {
-    try {
-        localStorage.setItem(key, value);
-    } catch (e) {
-        console.warn("Schreib-Zugriff auf localStorage vom Browser blockiert.");
-    }
+    try { localStorage.setItem(key, value); } catch (e) {}
 }
 
 function safeRemoveStorage(key) {
-    try {
-        localStorage.removeItem(key);
-    } catch (e) {
-        console.warn("Lösch-Zugriff auf localStorage vom Browser blockiert.");
-    }
+    try { localStorage.removeItem(key); } catch (e) {}
 }
 
-const MASTER_ID = 'hghub-global-master-v3';
+// Fester Raumname für euch beide
+const ROOM_ID = 'hangout-hub-duo-room-2026';
 let verificationCode = '';
 let currentUser = null;
 
 let peer = null;
-let discoveryPeer = null; 
 let localStream = null;
 let isHost = false;
-let masterConnection = null;
 
 const activePeers = {}; 
 const peerData = {};    
@@ -104,15 +89,10 @@ async function fetchViaProxy(url) {
     for (const proxyUrl of proxies) {
         try {
             const response = await fetch(proxyUrl);
-            if (response.ok) {
-                return await response.json();
-            }
-        } catch (err) {
-            console.warn(`Proxy fehlgeschlagen (${proxyUrl}):`, err);
-        }
+            if (response.ok) return await response.json();
+        } catch (err) {}
     }
-
-    throw new Error('Verbindung zu Roblox fehlgeschlagen. Bitte versuche es in einem Moment erneut.');
+    throw new Error('Verbindung zu Roblox fehlgeschlagen.');
 }
 
 async function handleVerification() {
@@ -124,40 +104,26 @@ async function handleVerification() {
 
     try {
         const searchData = await fetchViaProxy(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(username)}&limit=10`);
-        
-        if (!searchData || !searchData.data || searchData.data.length === 0) {
-            throw new Error('Nutzer nicht gefunden.');
-        }
+        if (!searchData || !searchData.data || searchData.data.length === 0) throw new Error('Nutzer nicht gefunden.');
 
-        const userMatch = searchData.data.find(u => 
-            u.name.toLowerCase() === username.toLowerCase() || 
-            u.displayName.toLowerCase() === username.toLowerCase()
-        ) || searchData.data[0];
-
+        const userMatch = searchData.data.find(u => u.name.toLowerCase() === username.toLowerCase()) || searchData.data[0];
         const userId = userMatch.id;
 
         showStatus('Prüfe Bio...', '');
         const profileData = await fetchViaProxy(`https://users.roblox.com/v1/users/${userId}`);
-        
         if (!profileData || !profileData.description || !profileData.description.includes(verificationCode)) {
-            throw new Error('Code nicht in der Bio gefunden! (Speichern im Profil nicht vergessen)');
+            throw new Error('Code nicht in der Bio gefunden!');
         }
 
         showStatus('Lade Avatar...', '');
         const avatarData = await fetchViaProxy(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=true`);
-        
-        const avatarUrl = (avatarData && avatarData.data && avatarData.data[0]) 
-            ? avatarData.data[0].imageUrl 
-            : 'https://tr.rbxcdn.com/30day-avatar-headshot';
+        const avatarUrl = (avatarData && avatarData.data && avatarData.data[0]) ? avatarData.data[0].imageUrl : '';
 
         currentUser = { id: userId, username: profileData.name, avatar: avatarUrl };
         safeSetStorage('hangout_hub_user', JSON.stringify(currentUser));
         
-        showStatus('Verifizierung erfolgreich!', 'success');
-        setTimeout(() => {
-            startVoiceChat();
-        }, 500);
-
+        showStatus('Erfolgreich!', 'success');
+        setTimeout(() => startVoiceChat(), 500);
     } catch (err) {
         showStatus(err.message, 'error');
         dom.btnVerify.disabled = false;
@@ -183,55 +149,82 @@ async function startVoiceChat() {
         return;
     }
 
-    initPeerNode();
+    initRoomConnection();
 }
 
-function initPeerNode() {
+function initRoomConnection() {
     const config = {
-        config: {
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun.services.mozilla.com' }
-            ]
-        }
+        config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
     };
 
-    peer = new Peer(config);
+    // Versuch 1: Versuche, den Raum als HOST zu erstellen
+    peer = new Peer(ROOM_ID, config);
 
-    peer.on('open', (id) => {
-        peerData[id] = currentUser;
-        connectToMaster();
+    peer.on('open', () => {
+        isHost = true;
+        dom.connStatus.innerText = 'Verbunden (Host)';
+        dom.connStatus.className = 'badge host';
+        
+        setupPeerListeners();
+    });
+
+    peer.on('error', (err) => {
+        if (err.type === 'unavailable-id') {
+            // Raum existiert bereits -> Verbinde als CLIENT
+            isHost = false;
+            connectAsClient(config);
+        } else {
+            dom.connStatus.innerText = 'Fehler!';
+            dom.connStatus.className = 'badge connecting';
+        }
+    });
+}
+
+function connectAsClient(config) {
+    peer = new Peer(config); // Zufällige ID für den Client
+
+    peer.on('open', () => {
+        dom.connStatus.innerText = 'Verbunden (Client)';
+        dom.connStatus.className = 'badge connected';
+        
+        setupPeerListeners();
+
+        // Verbinde direkt zum Host
+        const conn = peer.connect(ROOM_ID);
+        setupConnection(conn);
+
+        // Rufe den Host an
+        const call = peer.call(ROOM_ID, localStream);
+        handleAudioCall(call);
+    });
+}
+
+function setupPeerListeners() {
+    peer.on('connection', (conn) => {
+        setupConnection(conn);
     });
 
     peer.on('call', (call) => {
         call.answer(localStream);
         handleAudioCall(call);
     });
-
-    peer.on('connection', (conn) => {
-        conn.on('data', (data) => {
-            if (data.type === 'profile') {
-                peerData[conn.peer] = data.profile;
-                addPeerCard(conn.peer, data.profile.username, data.profile.avatar);
-            }
-        });
-        conn.on('close', () => removePeer(conn.peer));
-    });
 }
 
-function connectToMaster() {
-    masterConnection = peer.connect(MASTER_ID);
-    
-    masterConnection.on('open', () => {
-        isHost = false;
-        dom.connStatus.innerText = 'Verbunden (Client)';
-        dom.connStatus.className = 'badge connected';
-        
-        masterConnection.send({ type: 'register', profile: currentUser });
+function setupConnection(conn) {
+    conn.on('open', () => {
+        conn.send({ type: 'profile', profile: currentUser });
     });
 
-    masterConnection.on('data', (data) => {
+    conn.on('data', (data) => {
+        if (data.type === 'profile') {
+            peerData[conn.peer] = data.profile;
+            addPeerCard(conn.peer, data.profile.username, data.profile.avatar);
+            
+            // Wenn wir Host sind, teilen wir den neuen Peer den anderen mit
+            if (isHost) {
+                broadcastPeerList(conn.peer);
+            }
+        }
         if (data.type === 'peer_list') {
             data.peers.forEach(targetId => {
                 if (targetId !== peer.id && !activePeers[targetId]) {
@@ -239,59 +232,36 @@ function connectToMaster() {
                 }
             });
         }
-    });
-
-    masterConnection.on('close', () => triggerHostFailover());
-    masterConnection.on('error', () => triggerHostFailover());
-}
-
-function triggerHostFailover() {
-    dom.connStatus.innerText = 'Wähle neuen Host...';
-    dom.connStatus.className = 'badge connecting';
-    
-    setTimeout(() => {
-        discoveryPeer = new Peer(MASTER_ID, {
-            config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
-        });
-
-        discoveryPeer.on('open', () => {
-            isHost = true;
-            dom.connStatus.innerText = 'Verbunden (Host)';
-            dom.connStatus.className = 'badge host';
-            
-            discoveryPeer.on('connection', (conn) => {
-                conn.on('data', (data) => {
-                    if (data.type === 'register') {
-                        const currentPeers = Object.keys(activePeers).concat([peer.id]);
-                        conn.send({ type: 'peer_list', peers: currentPeers });
-                    }
-                });
-            });
-        });
-
-        discoveryPeer.on('error', (err) => {
-            if (err.type === 'unavailable-id') {
-                connectToMaster();
+        if (data.type === 'new_peer') {
+            if (data.peerId !== peer.id && !activePeers[data.peerId]) {
+                connectToPeer(data.peerId);
             }
-        });
-    }, Math.random() * 2000);
-}
-
-function connectToPeer(targetId) {
-    const conn = peer.connect(targetId);
-    conn.on('open', () => {
-        conn.send({ type: 'profile', profile: currentUser });
-    });
-    
-    conn.on('data', (data) => {
-        if (data.type === 'profile') {
-            peerData[targetId] = data.profile;
-            addPeerCard(targetId, data.profile.username, data.profile.avatar);
         }
     });
 
-    conn.on('close', () => removePeer(targetId));
-    activePeers[targetId] = { conn };
+    conn.on('close', () => removePeer(conn.peer));
+    activePeers[conn.peer] = { conn };
+
+    if (isHost) {
+        // Sende dem neuen Client die Liste aller bereits verbundenen Peers
+        const existingPeers = Object.keys(activePeers).filter(id => id !== conn.peer);
+        conn.send({ type: 'peer_list', peers: existingPeers });
+    }
+}
+
+function broadcastPeerList(newPeerId) {
+    Object.keys(activePeers).forEach(id => {
+        if (id !== newPeerId && activePeers[id].conn) {
+            activePeers[id].conn.send({ type: 'new_peer', peerId: newPeerId });
+        }
+    });
+}
+
+function connectToPeer(targetId) {
+    if (activePeers[targetId]) return;
+
+    const conn = peer.connect(targetId);
+    setupConnection(conn);
 
     const call = peer.call(targetId, localStream);
     handleAudioCall(call);
@@ -310,7 +280,6 @@ function handleAudioCall(call) {
     });
 
     call.on('close', () => removePeer(call.peer));
-    
     if (!activePeers[call.peer]) activePeers[call.peer] = {};
     activePeers[call.peer].call = call;
 }
@@ -324,12 +293,10 @@ function addPeerCard(id, name, avatarUrl) {
 
     card.innerHTML = `
         <img src="${avatarUrl}" class="peer-avatar" alt="${name}">
-        
         <div class="peer-info">
             <span class="peer-name">${name}</span>
             <i class="fa-solid fa-microphone-slash peer-mute-icon"></i>
         </div>
-        
         ${id !== 'local' ? `
             <button class="peer-action-btn" onclick="togglePeerMute('${id}')" title="Stummschalten">
                 <i class="fa-solid fa-volume-high"></i>
@@ -341,14 +308,12 @@ function addPeerCard(id, name, avatarUrl) {
 
 function removePeer(id) {
     if (activePeers[id]) {
-        if (activePeers[id].call) activePeers[id].call.close();
+        if (activePeers[id].call) activePS = activePeers[id].call.close();
         if (activePeers[id].conn) activePeers[id].conn.close();
         delete activePeers[id];
     }
-    
     const card = document.getElementById(`card-${id}`);
     if (card) card.remove();
-    
     const audioEl = document.getElementById(`audio-${id}`);
     if (audioEl) audioEl.remove();
 }
@@ -359,18 +324,17 @@ function toggleLocalMute() {
     if (!audioTrack) return;
 
     audioTrack.enabled = !audioTrack.enabled;
-    
     const icon = dom.btnMuteSelf.querySelector('i');
     const localCard = document.getElementById('card-local');
 
     if (audioTrack.enabled) {
         dom.btnMuteSelf.classList.remove('muted');
         icon.className = 'fa-solid fa-microphone';
-        if(localCard) localCard.classList.remove('muted');
+        if (localCard) localCard.classList.remove('muted');
     } else {
         dom.btnMuteSelf.classList.add('muted');
         icon.className = 'fa-solid fa-microphone-slash';
-        if(localCard) localCard.classList.add('muted');
+        if (localCard) localCard.classList.add('muted');
     }
 }
 
@@ -378,7 +342,6 @@ window.togglePeerMute = function(id) {
     const audioEl = document.getElementById(`audio-${id}`);
     const btn = document.querySelector(`#card-${id} .peer-action-btn`);
     const card = document.getElementById(`card-${id}`);
-    
     if (!audioEl || !btn || !card) return;
     
     audioEl.muted = !audioEl.muted;
@@ -396,16 +359,11 @@ window.togglePeerMute = function(id) {
 };
 
 function leaveRoom() {
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-    }
-    
+    if (localStream) localStream.getTracks().forEach(track => track.stop());
     Object.keys(activePeers).forEach(id => removePeer(id));
     if (peer) peer.destroy();
-    if (discoveryPeer) discoveryPeer.destroy();
     
     dom.grid.innerHTML = '';
-    
     screens.chat.classList.remove('active');
     screens.lobby.classList.add('active');
     dom.btnVerify.disabled = false;
