@@ -1,5 +1,5 @@
 /** 
- * HANGOUT HUB - Hauptlogik (Stabiles Raum-System)
+ * HANGOUT HUB - Hauptlogik (Inklusive Mute- und Profil-Synchronisation)
  */
 
 function safeGetStorage(key) {
@@ -14,7 +14,6 @@ function safeRemoveStorage(key) {
     try { localStorage.removeItem(key); } catch (e) {}
 }
 
-// Fester Raumname für euch beide
 const ROOM_ID = 'hangout-hub-duo-room-2026';
 let verificationCode = '';
 let currentUser = null;
@@ -157,20 +156,17 @@ function initRoomConnection() {
         config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
     };
 
-    // Versuch 1: Versuche, den Raum als HOST zu erstellen
     peer = new Peer(ROOM_ID, config);
 
     peer.on('open', () => {
         isHost = true;
         dom.connStatus.innerText = 'Verbunden (Host)';
         dom.connStatus.className = 'badge host';
-        
         setupPeerListeners();
     });
 
     peer.on('error', (err) => {
         if (err.type === 'unavailable-id') {
-            // Raum existiert bereits -> Verbinde als CLIENT
             isHost = false;
             connectAsClient(config);
         } else {
@@ -181,19 +177,16 @@ function initRoomConnection() {
 }
 
 function connectAsClient(config) {
-    peer = new Peer(config); // Zufällige ID für den Client
+    peer = new Peer(config);
 
     peer.on('open', () => {
         dom.connStatus.innerText = 'Verbunden (Client)';
         dom.connStatus.className = 'badge connected';
-        
         setupPeerListeners();
 
-        // Verbinde direkt zum Host
         const conn = peer.connect(ROOM_ID);
         setupConnection(conn);
 
-        // Rufe den Host an
         const call = peer.call(ROOM_ID, localStream);
         handleAudioCall(call);
     });
@@ -212,7 +205,14 @@ function setupPeerListeners() {
 
 function setupConnection(conn) {
     conn.on('open', () => {
+        // Profil sofort senden
         conn.send({ type: 'profile', profile: currentUser });
+        
+        // Aktuellen eigenen Mute-Status direkt mitschicken
+        const audioTrack = localStream ? localStream.getAudioTracks()[0] : null;
+        if (audioTrack && !audioTrack.enabled) {
+            conn.send({ type: 'mute-status', muted: true });
+        }
     });
 
     conn.on('data', (data) => {
@@ -220,9 +220,18 @@ function setupConnection(conn) {
             peerData[conn.peer] = data.profile;
             addPeerCard(conn.peer, data.profile.username, data.profile.avatar);
             
-            // Wenn wir Host sind, teilen wir den neuen Peer den anderen mit
+            // Antworten, damit die Gegenseite unser Profil garantiert auch hat
+            conn.send({ type: 'profile', profile: currentUser });
+
             if (isHost) {
                 broadcastPeerList(conn.peer);
+            }
+        }
+        if (data.type === 'mute-status') {
+            const card = document.getElementById(`card-${conn.peer}`);
+            if (card) {
+                if (data.muted) card.classList.add('muted');
+                else card.classList.remove('muted');
             }
         }
         if (data.type === 'peer_list') {
@@ -243,7 +252,6 @@ function setupConnection(conn) {
     activePeers[conn.peer] = { conn };
 
     if (isHost) {
-        // Sende dem neuen Client die Liste aller bereits verbundenen Peers
         const existingPeers = Object.keys(activePeers).filter(id => id !== conn.peer);
         conn.send({ type: 'peer_list', peers: existingPeers });
     }
@@ -292,9 +300,9 @@ function addPeerCard(id, name, avatarUrl) {
     card.className = 'peer-card';
 
     card.innerHTML = `
-        <img src="${avatarUrl}" class="peer-avatar" alt="${name}">
+        <img src="${avatarUrl || 'https://tr.rbxcdn.com/30day-avatar-headshot'}" class="peer-avatar" alt="${name || 'Nutzer'}">
         <div class="peer-info">
-            <span class="peer-name">${name}</span>
+            <span class="peer-name">${name || 'Nutzer'}</span>
             <i class="fa-solid fa-microphone-slash peer-mute-icon"></i>
         </div>
         ${id !== 'local' ? `
@@ -308,7 +316,7 @@ function addPeerCard(id, name, avatarUrl) {
 
 function removePeer(id) {
     if (activePeers[id]) {
-        if (activePeers[id].call) activePS = activePeers[id].call.close();
+        if (activePeers[id].call) activePeers[id].call.close();
         if (activePeers[id].conn) activePeers[id].conn.close();
         delete activePeers[id];
     }
@@ -324,10 +332,12 @@ function toggleLocalMute() {
     if (!audioTrack) return;
 
     audioTrack.enabled = !audioTrack.enabled;
+    const isMuted = !audioTrack.enabled;
+    
     const icon = dom.btnMuteSelf.querySelector('i');
     const localCard = document.getElementById('card-local');
 
-    if (audioTrack.enabled) {
+    if (!isMuted) {
         dom.btnMuteSelf.classList.remove('muted');
         icon.className = 'fa-solid fa-microphone';
         if (localCard) localCard.classList.remove('muted');
@@ -336,6 +346,13 @@ function toggleLocalMute() {
         icon.className = 'fa-solid fa-microphone-slash';
         if (localCard) localCard.classList.add('muted');
     }
+
+    // Mute-Status an alle verbundenen Freunde senden
+    Object.values(activePeers).forEach(peerObj => {
+        if (peerObj.conn && peerObj.conn.open) {
+            peerObj.conn.send({ type: 'mute-status', muted: isMuted });
+        }
+    });
 }
 
 window.togglePeerMute = function(id) {
