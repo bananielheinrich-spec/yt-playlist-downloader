@@ -1,5 +1,5 @@
 /** 
- * HANGOUT HUB - Hauptlogik
+ * HANGOUT HUB - Hauptlogik (Vollständig & Korrigiert)
  * Senior Frontend & WebRTC Implementation
  */
 
@@ -23,6 +23,7 @@ const screens = {
     lobby: document.getElementById('lobby-screen'),
     chat: document.getElementById('chat-screen')
 };
+
 const dom = {
     verifyCode: document.getElementById('verify-code'),
     btnVerify: document.getElementById('btn-verify'),
@@ -45,39 +46,62 @@ const dom = {
 function init() {
     // Code generieren
     verificationCode = 'HUB-' + Math.floor(1000 + Math.random() * 9000);
-    dom.verifyCode.innerText = verificationCode;
+    if (dom.verifyCode) dom.verifyCode.innerText = verificationCode;
 
     // Check LocalStorage
     const saved = localStorage.getItem('hangout_hub_user');
     if (saved) {
-        currentUser = JSON.parse(saved);
-        dom.savedAvatar.src = currentUser.avatar;
-        dom.savedUsername.innerText = currentUser.username;
-        dom.loginSection.classList.add('hidden');
-        dom.savedSection.classList.remove('hidden');
+        try {
+            currentUser = JSON.parse(saved);
+            dom.savedAvatar.src = currentUser.avatar;
+            dom.savedUsername.innerText = currentUser.username;
+            dom.loginSection.classList.add('hidden');
+            dom.savedSection.classList.remove('hidden');
+        } catch (e) {
+            localStorage.removeItem('hangout_hub_user');
+        }
     }
 
     // Event Listeners
-    dom.btnVerify.addEventListener('click', handleVerification);
-    dom.btnQuickJoin.addEventListener('click', startVoiceChat);
-    dom.btnLogout.addEventListener('click', () => {
-        localStorage.removeItem('hangout_hub_user');
-        currentUser = null;
-        dom.savedSection.classList.add('hidden');
-        dom.loginSection.classList.remove('hidden');
-    });
-    dom.btnMuteSelf.addEventListener('click', toggleLocalMute);
-    dom.btnLeave.addEventListener('click', leaveRoom);
+    if (dom.btnVerify) dom.btnVerify.addEventListener('click', handleVerification);
+    if (dom.btnQuickJoin) dom.btnQuickJoin.addEventListener('click', startVoiceChat);
+    if (dom.btnLogout) {
+        dom.btnLogout.addEventListener('click', () => {
+            localStorage.removeItem('hangout_hub_user');
+            currentUser = null;
+            dom.savedSection.classList.add('hidden');
+            dom.loginSection.classList.remove('hidden');
+        });
+    }
+    if (dom.btnMuteSelf) dom.btnMuteSelf.addEventListener('click', toggleLocalMute);
+    if (dom.btnLeave) dom.btnLeave.addEventListener('click', leaveRoom);
 }
 
-// --- 2. ROBLOX VERIFIZIERUNG (via allorigins) ---
+// --- 2. ROBLOX VERIFIZIERUNG (mit Multi-Proxy Fallback) ---
 
 async function fetchViaProxy(url) {
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const response = await fetch(proxyUrl);
-    if (!response.ok) throw new Error('Proxy Fehler');
-    const data = await response.json();
-    return JSON.parse(data.contents);
+    // Liste von Proxies – schlägt einer wegen CORS/Rate-Limit fehl, greift sofort der nächste
+    const proxies = [
+        // 1. RoProxy (Spezialisiert auf Roblox APIs)
+        url.replace('roblox.com', 'roproxy.com'),
+        // 2. Corsproxy.io
+        `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        // 3. Allorigins.win (im Raw-Modus)
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+    ];
+
+    for (const proxyUrl of proxies) {
+        try {
+            const response = await fetch(proxyUrl);
+            if (response.ok) {
+                return await response.json();
+            }
+        } catch (err) {
+            console.warn(`Proxy fehlgeschlagen (${proxyUrl}):`, err);
+        }
+    }
+
+    throw new Error('Verbindung zu Roblox fehlgeschlagen. Bitte versuche es erneut.');
 }
 
 async function handleVerification() {
@@ -88,30 +112,44 @@ async function handleVerification() {
     dom.btnVerify.disabled = true;
 
     try {
-        // 1. Hole User ID via Search API
-        const searchData = await fetchViaProxy(`https://users.roblox.com/v1/users/search?keyword=${username}&limit=10`);
-        const userMatch = searchData.data.find(u => u.name.toLowerCase() === username.toLowerCase() || u.displayName.toLowerCase() === username.toLowerCase());
+        // 1. User-ID abfragen
+        const searchData = await fetchViaProxy(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(username)}&limit=10`);
         
-        if (!userMatch) throw new Error('Nutzer nicht gefunden.');
+        if (!searchData || !searchData.data || searchData.data.length === 0) {
+            throw new Error('Nutzer nicht gefunden.');
+        }
+
+        const userMatch = searchData.data.find(u => 
+            u.name.toLowerCase() === username.toLowerCase() || 
+            u.displayName.toLowerCase() === username.toLowerCase()
+        ) || searchData.data[0];
+
         const userId = userMatch.id;
 
-        // 2. Prüfe Bio
+        // 2. Profil-Bio abfragen
         showStatus('Prüfe Bio...', '');
         const profileData = await fetchViaProxy(`https://users.roblox.com/v1/users/${userId}`);
         
-        if (!profileData.description.includes(verificationCode)) {
-            throw new Error('Code nicht in der Bio gefunden! (Speichern nicht vergessen)');
+        if (!profileData || !profileData.description || !profileData.description.includes(verificationCode)) {
+            throw new Error('Code nicht in der Bio gefunden! (Speichern im Profil nicht vergessen)');
         }
 
-        // 3. Hole Avatar
+        // 3. Avatar Headshot laden
         showStatus('Lade Avatar...', '');
         const avatarData = await fetchViaProxy(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=true`);
-        const avatarUrl = avatarData.data[0].imageUrl;
+        
+        const avatarUrl = (avatarData && avatarData.data && avatarData.data[0]) 
+            ? avatarData.data[0].imageUrl 
+            : 'https://tr.rbxcdn.com/30day-avatar-headshot';
 
-        // 4. Speichern & Starten
+        // 4. Speichern & Voice-Chat starten
         currentUser = { id: userId, username: profileData.name, avatar: avatarUrl };
         localStorage.setItem('hangout_hub_user', JSON.stringify(currentUser));
-        startVoiceChat();
+        
+        showStatus('Verifizierung erfolgreich!', 'success');
+        setTimeout(() => {
+            startVoiceChat();
+        }, 500);
 
     } catch (err) {
         showStatus(err.message, 'error');
@@ -121,7 +159,7 @@ async function handleVerification() {
 
 function showStatus(msg, type) {
     dom.statusMsg.innerText = msg;
-    dom.statusMsg.className = 'status-message ' + type;
+    dom.statusMsg.className = 'status-message ' + (type || '');
 }
 
 // --- 3. WEBRTC & PEER LOGIK ---
@@ -130,7 +168,7 @@ async function startVoiceChat() {
     screens.lobby.classList.remove('active');
     screens.chat.classList.add('active');
     
-    // UI Setup für eigenen User
+    // Eigene Karte im Grid erstellen
     addPeerCard('local', currentUser.username, currentUser.avatar);
 
     try {
@@ -158,19 +196,16 @@ function initPeerNode() {
     peer = new Peer(config);
 
     peer.on('open', (id) => {
-        // Erfolgreich als normaler Client registriert
         peerData[id] = currentUser;
         connectToMaster();
     });
 
     peer.on('call', (call) => {
-        // Eingehender Audio-Call (Mesh)
         call.answer(localStream);
         handleAudioCall(call);
     });
 
     peer.on('connection', (conn) => {
-        // Eingehende Datenverbindung (Mesh Meta-Daten)
         conn.on('data', (data) => {
             if (data.type === 'profile') {
                 peerData[conn.peer] = data.profile;
@@ -189,13 +224,11 @@ function connectToMaster() {
         dom.connStatus.innerText = 'Verbunden (Client)';
         dom.connStatus.className = 'badge connected';
         
-        // Sende eigenes Profil an Master
         masterConnection.send({ type: 'register', profile: currentUser });
     });
 
     masterConnection.on('data', (data) => {
         if (data.type === 'peer_list') {
-            // Master teilt uns mit, wer im Raum ist. Wir rufen sie an.
             data.peers.forEach(targetId => {
                 if (targetId !== peer.id && !activePeers[targetId]) {
                     connectToPeer(targetId);
@@ -205,12 +238,10 @@ function connectToMaster() {
     });
 
     masterConnection.on('close', () => {
-        // FAILOVER LOGIK: Master ist weg!
         triggerHostFailover();
     });
 
     masterConnection.on('error', () => {
-        // Master existiert noch nicht -> Wir werden Master!
         triggerHostFailover();
     });
 }
@@ -221,14 +252,12 @@ function triggerHostFailover() {
     dom.connStatus.innerText = 'Wähle neuen Host...';
     dom.connStatus.className = 'badge connecting';
     
-    // Zufällige Verzögerung, damit nicht alle gleichzeitig versuchen Master zu werden
     setTimeout(() => {
         discoveryPeer = new Peer(MASTER_ID, {
             config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
         });
 
         discoveryPeer.on('open', () => {
-            // WIR SIND DER NEUE MASTER
             isHost = true;
             dom.connStatus.innerText = 'Verbunden (Host)';
             dom.connStatus.className = 'badge host';
@@ -236,7 +265,6 @@ function triggerHostFailover() {
             discoveryPeer.on('connection', (conn) => {
                 conn.on('data', (data) => {
                     if (data.type === 'register') {
-                        // Sende neuem Client alle bisherigen Peers
                         const currentPeers = Object.keys(activePeers).concat([peer.id]);
                         conn.send({ type: 'peer_list', peers: currentPeers });
                     }
@@ -246,7 +274,6 @@ function triggerHostFailover() {
 
         discoveryPeer.on('error', (err) => {
             if (err.type === 'unavailable-id') {
-                // Jemand anders war schneller. Wir verbinden uns mit dem neuen Master.
                 connectToMaster();
             }
         });
@@ -256,7 +283,6 @@ function triggerHostFailover() {
 // --- 5. MESH AUDIO & VERBINDUNGEN ---
 
 function connectToPeer(targetId) {
-    // 1. Data Connection für Profil
     const conn = peer.connect(targetId);
     conn.on('open', () => {
         conn.send({ type: 'profile', profile: currentUser });
@@ -272,14 +298,12 @@ function connectToPeer(targetId) {
     conn.on('close', () => removePeer(targetId));
     activePeers[targetId] = { conn };
 
-    // 2. Audio Call starten
     const call = peer.call(targetId, localStream);
     handleAudioCall(call);
 }
 
 function handleAudioCall(call) {
     call.on('stream', (remoteStream) => {
-        // Audio Element erstellen
         let audioEl = document.getElementById(`audio-${call.peer}`);
         if (!audioEl) {
             audioEl = document.createElement('audio');
@@ -330,6 +354,8 @@ function removePeer(id) {
 function toggleLocalMute() {
     if (!localStream) return;
     const audioTrack = localStream.getAudioTracks()[0];
+    if (!audioTrack) return;
+
     audioTrack.enabled = !audioTrack.enabled;
     
     const icon = dom.btnMuteSelf.querySelector('i');
@@ -350,6 +376,8 @@ window.togglePeerMute = function(id) {
     
     audioEl.muted = !audioEl.muted;
     const btn = document.querySelector(`#card-${id} .peer-mute-btn`);
+    if (!btn) return;
+
     const icon = btn.querySelector('i');
     
     if (audioEl.muted) {
@@ -362,7 +390,6 @@ window.togglePeerMute = function(id) {
 };
 
 function leaveRoom() {
-    // Alles aufräumen
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
     }
@@ -379,5 +406,5 @@ function leaveRoom() {
     showStatus('', '');
 }
 
-// App starten
-init();
+// App starten sobald DOM geladen ist
+document.addEventListener('DOMContentLoaded', init);
